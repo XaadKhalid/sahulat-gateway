@@ -1,0 +1,24 @@
+[importlinter]
+root_package = app
+include_external_packages = True
+
+[importlinter:contract:schemas]
+name = Schemas do not depend on application layers or HTTP frameworks
+type = forbidden
+source_modules =
+    app.schemas
+forbidden_modules =
+    app.api
+    app.core
+    app.main
+    fastapi
+
+[importlinter:contract:configuration]
+name = Configuration does not depend on HTTP adapters or composition
+type = forbidden
+source_modules =
+    app.core
+forbidden_modules =
+    app.api
+    app.main
+    fastapi
