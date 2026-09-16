@@ -31,7 +31,7 @@ logs for deployment unless a reviewed redaction policy is in place.
 ## Verification
 
 ```shell
-uv run --locked python -m compileall -q app tests
+uv run --locked python -m compileall -q app tests migrations
 uv run --locked ruff check .
 uv run --locked ruff format --check .
 uv run --locked mypy
@@ -41,4 +41,6 @@ uv run --locked pytest
 
 Architecture tests include a deliberately invalid import in a temporary copy.
 Contracts cover currently implemented packages; extend them as business packages
-arrive. No database, queue, WhatsApp adapter or deployed service exists yet.
+arrive. PostgreSQL persistence and RLS are implemented; no queue, WhatsApp adapter
+or deployed service exists yet. See [the persistence runbook](docs/persistence.md)
+for provisioning, migration and Docker-backed integration tests.
