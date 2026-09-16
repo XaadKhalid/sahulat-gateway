@@ -161,7 +161,7 @@ async def test_runtime_login_has_no_privileged_attributes(database: Database) ->
                 AND c.relrowsecurity AND c.relforcerowsecurity"""
                 )
             )
-            == 3
+            == 4
         )
 
 

@@ -2,13 +2,24 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
 from app.api.health import create_health_router
-from app.api.limits import HealthRequestLimits
+from app.api.limits import GatewayRequestLimits
+
+
+def _clock() -> float:
+    return 100.0
+
+
+def test_limits_permit_traffic_below_threshold() -> None:
+    limits = GatewayRequestLimits(health_limit=10, webhook_limit=100, clock=_clock)
+    for _ in range(10):
+        assert limits._permit_health() is True
+    assert limits._permit_health() is False
 
 
 async def test_probe_rate_limit_recovers_after_window() -> None:
     now = 10.0
     application = FastAPI()
-    limits = HealthRequestLimits(2, clock=lambda: now)
+    limits = GatewayRequestLimits(health_limit=2, webhook_limit=2, clock=lambda: now)
     application.middleware("http")(limits.dispatch)
     application.include_router(create_health_router())
     async with AsyncClient(

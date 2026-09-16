@@ -6,6 +6,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="SAHULAT_", frozen=True)
 
     health_requests_per_second: int = Field(default=10, ge=1, le=1000)
+    webhook_requests_per_second: int = Field(default=100, ge=1, le=10000)
+    webhook_secret: SecretStr
+    webhook_verify_token: SecretStr
 
 
 class DatabaseSettings(BaseSettings):

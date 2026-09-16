@@ -22,14 +22,13 @@ modifies a temporary copy and proves a forbidden import is rejected.
 ## In progress
 
 No implementation task is partially complete. Current branch:
-`task/SAH-004-audit-storage`.
+`main`.
 
 ## Next up, in order
 
-1. SAH-005: authenticated WhatsApp ingress; replace bootstrap's blanket body policy.
-3. SAH-006: durable dispatch and worker recovery.
-4. SAH-007: outbound text echo.
-5. SAH-008: deployment and real-number demonstration.
+1. SAH-006: durable dispatch and worker recovery.
+2. SAH-007: outbound text echo.
+3. SAH-008: deployment and real-number demonstration.
 
 Read the relevant docs/tasks file before implementation. Continue on a separate
 `task/<id>-<slug>` branch based on the completed prerequisite work.
