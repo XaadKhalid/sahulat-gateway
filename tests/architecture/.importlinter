@@ -3,7 +3,7 @@ root_package = app
 include_external_packages = True
 
 [importlinter:contract:schemas]
-name = Schemas do not depend on application layers or HTTP frameworks
+name = Schemas do not depend on application layers or I/O frameworks
 type = forbidden
 source_modules =
     app.schemas
@@ -11,7 +11,11 @@ forbidden_modules =
     app.api
     app.core
     app.main
+    app.infrastructure
+    app.models
+    app.repositories
     fastapi
+    sqlalchemy
 
 [importlinter:contract:configuration]
 name = Configuration does not depend on HTTP adapters or composition
@@ -20,5 +24,39 @@ source_modules =
     app.core
 forbidden_modules =
     app.api
+    app.main
+    fastapi
+
+[importlinter:contract:api]
+name = HTTP adapters do not access persistence directly
+type = forbidden
+source_modules =
+    app.api
+forbidden_modules =
+    app.repositories
+    app.models
+    app.infrastructure
+    sqlalchemy
+
+[importlinter:contract:repositories]
+name = Repositories do not depend on HTTP adapters or composition
+type = forbidden
+source_modules =
+    app.repositories
+forbidden_modules =
+    app.api
+    app.main
+    fastapi
+
+[importlinter:contract:models]
+name = ORM mappings do not depend on services or adapters
+type = forbidden
+source_modules =
+    app.models
+forbidden_modules =
+    app.api
+    app.core
+    app.infrastructure
+    app.repositories
     app.main
     fastapi
