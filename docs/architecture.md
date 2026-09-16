@@ -11,7 +11,7 @@ two linters and two review standards, for a gateway that is deliberately thin
 and not on any measured hot path. FastAPI handles webhook ingress comfortably.
 This stays inside the document's own sanctioned stack while halving the surface
 that agents can get wrong. If load ever justifies a separate Go gateway,
-extracting it is a contained job because it sits behind `IChannelAdapter`.
+extracting it is a contained job because it sits behind `ChannelAdapter`.
 
 One naming note: the document refers to an orchestration framework called
 "gentic-ai". There is no such installable package. Read every reference to it as
@@ -47,7 +47,7 @@ app/
         webhooks.py            WhatsApp inbound — thin, signature verify, enqueue
         admin.py               control plane API
   channels/
-    base.py                    ChannelAdapter protocol + MessageEnvelope
+    # Channel protocols belong to their consumers; envelopes live in schemas.
     whatsapp/                  the ONLY WhatsApp-aware code in the system
   orchestration/
     turn_loop.py               the core loop, framework-free
@@ -201,3 +201,11 @@ What else was on the table and why it lost.
 
 ADRs are how a new agent in month four understands why something looks the way
 it does, instead of "improving" it back into a problem you already solved.
+
+## Accepted M0 clarifications
+
+ADR 0001 governs contract ownership, required boundary protocols, durable dispatch,
+audit/transcript separation, and temporary operator review. Shared envelopes belong
+in schemas; outbound protocols belong to orchestration. Schemas depend only on
+the standard library and Pydantic, not other application layers. Add only modules
+consumed by the current milestone. See [ADR 0001](adr/0001-m0-contracts.md).

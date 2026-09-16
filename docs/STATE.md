@@ -11,20 +11,17 @@ commits, only untracked operating/product/architecture documents and a human
 reference HTML file. No implementation exists. The original STATE was an empty
 template, not evidence of working software.
 
-SAH-001 has established the task backlog and concrete decision proposals.
-Read ADRs 0001 and 0002 before implementation. They are proposed, not accepted;
-task-list approval did not approve package additions or resolve conflicting
-engineering requirements.
+SAH-001 is complete. The owner approved ADRs 0001 and 0002 on 2026-09-16. Their contract clarifications and staged dependency list are accepted. SAH-002 is the next implementation task.
 
 ## In progress
 
 | Task | Branch | State | Next concrete step |
 |---|---|---|---|
-| SAH-001 | task/SAH-001-m0-baseline | Documentation prepared; decisions pending | Obtain approval of ADR proposals and deployment information |
+| SAH-002 | task/SAH-002-application-bootstrap | Approved | Implement and validate the bootstrap |
 
 ## Next up, in order
 
-1. SAH-002: application bootstrap and quality gates, after dependency approval.
+1. SAH-002: application bootstrap and quality gates; dependencies approved.
 2. SAH-003: tenant provisioning and isolated persistence.
 3. SAH-004: append-only audit storage.
 4. SAH-005: authenticated WhatsApp ingress.
@@ -38,8 +35,6 @@ Detailed scope, prerequisites, and acceptance criteria are in docs/tasks/.
 
 | Question | Blocks | Who decides |
 |---|---|---|
-| Approve packages in ADR 0002? | SAH-002 and subsequent package additions | Project owner |
-| Approve contract ownership, required-protocol exception, delivery and audit proposals in ADR 0001? | SAH-003 onward | Project owner |
 | Which deployment host/account, HTTPS domain, secret store, test number and operator will be used? | SAH-008 | Project owner |
 | What retention period and authorized audit-reader role apply? | Deployment | Project owner |
 
@@ -56,8 +51,8 @@ Detailed scope, prerequisites, and acceptance criteria are in docs/tasks/.
 ## Decisions made recently
 
 - Eight session-sized tasks approved by the user; no implementation yet.
-- [ADR 0001](adr/0001-m0-contracts.md) contains reviewable proposals for contradictory requirements.
-- [ADR 0002](adr/0002-m0-dependencies.md) contains the dependency approval request; no dependencies installed.
+- [ADR 0001](adr/0001-m0-contracts.md) records approved resolutions of contradictory requirements.
+- [ADR 0002](adr/0002-m0-dependencies.md) records the approved staged dependency list.
 
 ## Deliberately not done
 
@@ -73,3 +68,8 @@ No source HTML was read or modified.
 - Assumed: approval covers the task list, not unspecified dependencies or deployment accounts.
 - Left for next: dependency/contract approval, then SAH-002; runtime/tooling verification.
 - Validation: eight task files and two ADRs passed structural checks; no application tests exist yet. The pre-existing docs/source HTML remains untracked and untouched.
+
+### 2026-09-16 — Codex — SAH-002 approval record
+- Owner approved both ADR proposals. SAH-001 acceptance criteria are satisfied.
+- Architecture and engineering standards now reference the accepted M0 clarifications.
+- Deployment account, test-number access, retention and operator details remain open for SAH-008.

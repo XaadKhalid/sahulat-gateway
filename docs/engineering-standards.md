@@ -227,3 +227,10 @@ rejected. Business logic that imports from `fastapi` is rejected.
 - Module-level code does nothing but define things. No side effects on import.
 - Comments explain *why*. The code already says *what*.
 - No commented-out code. Git remembers it.
+
+## Accepted M0 exceptions
+
+[ADR 0001](adr/0001-m0-contracts.md) permits consumer-owned I/O protocols with one
+implementation when current behavior needs the boundary. It does not permit
+unused future protocols. It also defines restricted transcript storage versus
+redacted operational logging and durable operator review before the M5 inbox.

@@ -1,15 +1,15 @@
 # 0002. Minimal M0 dependency approval
 Date: 2026-09-16
-Status: proposed
+Status: accepted
 
 ## Context
 
 AGENTS.md requires asking before adding packages to pyproject.toml. No manifest
 exists. The approved task list does not specify package additions.
 
-## Decision proposed
+## Decision
 
-Approve these direct dependencies, added only when their task consumes them:
+The owner approved these direct dependencies, added only when their task consumes them:
 
 | Task | Packages | Purpose |
 |---|---|---|

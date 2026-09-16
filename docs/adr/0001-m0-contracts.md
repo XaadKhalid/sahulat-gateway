@@ -1,15 +1,15 @@
 # 0001. M0 contracts, durable delivery, and audit boundaries
 Date: 2026-09-16
-Status: proposed
+Status: accepted
 
 ## Context
 
 SAH-001 found conflicting protocol ownership and abstraction requirements, plus
 unspecified recovery and audit behavior. M0 must prove a text echo without
-implementing later milestones. Owner approval is required before changing
+implementing later milestones. Owner approval was received on 2026-09-16 before changing
 conflicting requirements or implementing the dependent behavior.
 
-## Decision proposed
+## Decision
 
 1. Put MessageEnvelope and channel-neutral payloads in app/schemas/messages.py.
    Consumer-owned outbound and repository protocols live with orchestration.

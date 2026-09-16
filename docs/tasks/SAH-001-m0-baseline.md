@@ -12,7 +12,7 @@ Document actual repository state, create task files, and prepare contract and de
 - [x] STATE.md describes the observed baseline without claiming a working build.
 - [x] SAH-001 through SAH-008 have explicit scope and acceptance criteria.
 - [x] ADRs record contract placement, protocol exception, supported M0 input, delivery recovery, audit handling, and pre-M5 failure handling.
-- [ ] Dependency and contract proposals are approved before dependent implementation; deployment requirements are recorded.
+- [x] Dependency and contract proposals are approved before dependent implementation; deployment requirements are recorded.
 
 ## Out of scope
 
