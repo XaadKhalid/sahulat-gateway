@@ -6,13 +6,13 @@
 
 ## Where the project actually is
 
-SAH-001, SAH-002, and SAH-003 are complete. The owner approved ADRs 0001, 0002, and 0004.
+SAH-001, SAH-002, SAH-003, and SAH-004 are complete. The owner approved ADRs 0001, 0002, 0004, and 0005.
 The FastAPI application factory runs through Uvicorn and exposes public GET
 /health with a typed process-liveness response. It loads validated environment
 configuration at factory invocation, not import time. Documentation routes are
 disabled. A bounded per-process rate limit and no-body request policy cover this
 bootstrap. 
-Tenant provisioning and isolated persistence exist using PostgreSQL. The database enforces Row-Level Security (RLS) to isolate tenants. Repositories manage sessions and messages with idempotency constraints. No queue, WhatsApp or model implementation exists.
+Tenant provisioning and isolated persistence exist using PostgreSQL. The database enforces Row-Level Security (RLS) to isolate tenants. Repositories manage sessions and messages with idempotency constraints. A partitioned, append-only audit event table exists to store critical events securely. Standard operational logging redacts phone numbers and payloads. No queue, WhatsApp or model implementation exists.
 
 The uv manifest contains approved SAH-002 and SAH-003 packages; uv.lock is committed.
 CI defines compilation, Ruff lint/format, strict mypy, import-linter and pytest.
@@ -22,12 +22,11 @@ modifies a temporary copy and proves a forbidden import is rejected.
 ## In progress
 
 No implementation task is partially complete. Current branch:
-`task/SAH-003-tenant-persistence`.
+`task/SAH-004-audit-storage`.
 
 ## Next up, in order
 
-1. SAH-004: append-only audit storage.
-2. SAH-005: authenticated WhatsApp ingress; replace bootstrap's blanket body policy.
+1. SAH-005: authenticated WhatsApp ingress; replace bootstrap's blanket body policy.
 3. SAH-006: durable dispatch and worker recovery.
 4. SAH-007: outbound text echo.
 5. SAH-008: deployment and real-number demonstration.
@@ -74,6 +73,7 @@ Read the relevant docs/tasks file before implementation. Continue on a separate
 - [ADR 0003](adr/0003-liveness-bootstrap.md): application factory, health semantics,
   bounded local probe policy and bootstrap quality gates.
 - [ADR 0004](adr/0004-tenant-persistence.md): accepted tenant-scoped PostgreSQL persistence with Row-Level Security.
+- [ADR 0005](adr/0005-audit-storage.md): accepted declarative PostgreSQL partitioning and strict insert-only database grants for audit logs.
 
 ## Deliberately not done
 
@@ -82,6 +82,13 @@ remote CI execution, or reads/changes to the original reference HTML. The servic
 is a local bootstrap; M0 is not yet complete.
 
 ## Session log
+
+### 2026-09-16 — Antigravity — SAH-004
+- Did: Created `AuditRow` with partitioned boundaries and restricted INSERT-only grants. Implemented `AuditRepository` for transactional event logging. Wrote `RedactingFormatter` to protect operational logs.
+- Validation: Integration tests prove `UPDATE`/`DELETE` are impossible. Unit tests confirm redaction rules work.
+- Decided: Built-in `logging.Formatter` used rather than importing structural loggers. Partition provisioning procedure encapsulated inside Postgres.
+- Assumed: N/A.
+- Next: SAH-005.
 
 ### 2026-09-16 — Antigravity — SAH-003
 - Did: Reviewed uncommitted SAH-003 codebase left by previous agent. Verified acceptance criteria are met. Tests confirm isolation boundaries and RLS protection. Committed the work.
