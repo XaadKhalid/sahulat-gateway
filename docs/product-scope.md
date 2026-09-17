@@ -19,7 +19,7 @@ a bank with a different manifest and no code change.
 
 | Capability | Detail |
 |---|---|
-| Channel | WhatsApp Cloud API. Inbound text, interactive buttons and lists. Outbound text, buttons, approved templates, 24-hour service window handling. |
+| Channel | WhatsApp Cloud API. Inbound text, interactive buttons and lists. Outbound text, buttons, approved templates, 24-hour service window handling. **Development and testing use Meta's own free test number and access token directly through the Cloud API — no BSP (Twilio/360dialog/etc.) in the loop, no cost.** See the note below the table. |
 | Knowledge | Ingest PDF, DOCX, XLSX, MD, HTML and crawled web pages. Chunk by structure. Hybrid retrieval. Answers grounded in the corpus only. |
 | Catalog | Product data as a first-class queryable source: search, availability, price, variants. |
 | Identity | Phone number as principal. Anonymous → known → verified tiers. Lookup against tenant API. OTP step-up. |
@@ -28,7 +28,7 @@ a bank with a different manifest and no code change.
 | Guardrails | Domain fence, tool exposure by tier, prompt-injection defence on retrieved content and tool results, PII redaction in logs. |
 | Human handoff | Escalate with full context to a human inbox; human replies in the same thread; AI resumes. |
 | Audit | Complete, append-only, queryable. |
-| Control plane | Minimum viable: upload docs, register manifest, set policy, sandbox test chat, view conversations. |
+| Control plane | Minimal, multi-tenant admin portal. Deliberately few screens for phase 1: **user management** (portal operator/staff accounts and roles), **business profile management** (tenant onboarding — name, WhatsApp connection, document upload, manifest registration, policy settings), and a **sandbox chat window** for real-time conversation testing against the live orchestrator before a tenant goes live. Clean and functional over feature-rich; every additional screen is a phase 2+ decision, not a default. |
 
 ### Explicitly out of scope for phase 1
 
@@ -52,6 +52,17 @@ boundaries already named in `architecture.md`.
 
 If a task seems to require one of these, stop and raise it. The most likely
 failure mode of this project is building phase 3 before phase 1 works.
+
+### A note on WhatsApp testing cost
+
+Development and testing on the real WhatsApp Cloud API do not cost money.
+Direct from Meta: no monthly fee for API access, a free test phone number and
+temporary access token from the Meta Developers console, and service
+conversations (replies inside a customer-initiated 24-hour window) are free
+and uncapped. What costs money is a paid BSP layer (Twilio, 360dialog, Wati,
+etc.) added on top, and template/marketing messages sent outside that window
+at scale — neither applies to phase 1 development. Build and test directly
+against Meta's Cloud API, not through a BSP, for exactly this reason.
 
 ## Milestones
 
