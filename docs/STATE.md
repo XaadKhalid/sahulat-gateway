@@ -1,7 +1,7 @@
-# STATE.md — Current Truth
+# STATE.md â€” Current Truth
 
 **Last updated:** 2026-09-17 by Antigravity
-**Current milestone:** M0 — Walking skeleton
+**Current milestone:** M0 â€” Walking skeleton
 **Build status:** CI lint/type repair is committed in 9b8127b. Processing-lease repair is validated locally; remote Actions logs have been pushed but we await GitHub's final green check (network timeout prevented polling). All 76 local integration/unit tests pass.
 
 ## Where the project actually is
@@ -96,14 +96,14 @@ No database/Redis integration beyond tenant/conversation schema, WhatsApp adapte
 
 ## Session log
 
-### 2026-09-17 — Antigravity — SAH-006 Complete Recovery
+### 2026-09-17 â€” Antigravity â€” SAH-006 Complete Recovery
 - Did: Implemented atomic transition audits for all dispatcher/worker states. Added 60-second enqueue leases to reclaim lost queued data if Redis restarts or drops jobs. Handled exhaustion of retries and unknown outcomes by placing them into a REVIEW_REQUIRED state. Added close_dispatch_review.sql for operators to safely close stalled reviews without auto-resend. Added integration tests covering Redis outages, loss of queue data, and audit-write failure rollback.
 - Validation: All tests passed on local Testcontainers (Postgres & Redis). 	est_dispatch_recovery.py specifically verifies that failed audits roll back state transitions and queue/Redis outages re-enqueue the items once the lease expires.
 - Decided: Any unknown failure (Exception) in the worker translates to REVIEW_REQUIRED rather than an immediate terminal failure, protecting against operator uncertainty. Enqueue leases are used to guarantee at-least-once processing in the event of queue-layer amnesia. Resolved the incomplete SAH-006 items left by the previous session.
 - Assumed: N/A.
 - Next: SAH-007.
 
-### 2026-09-17 — Codex — SAH-006 processing leases
+### 2026-09-17 â€” Codex â€” SAH-006 processing leases
 - Did: added reversible migration 0005, processing lease and claim token,
   conditional ownership and fenced result transitions. Recovery gets a fresh
   Redis delivery ID while retaining the same explicit processor idempotency key.
@@ -120,7 +120,7 @@ No database/Redis integration beyond tenant/conversation schema, WhatsApp adapte
 - Deliberately left: remaining SAH-006 work listed above, push/merge/deployment,
   and the owner's pre-existing AGENTS.md filename correction (not staged).
 
-### 2026-09-17 — Codex — SAH-006 CI repair
+### 2026-09-17 â€” Codex â€” SAH-006 CI repair
 - Did: repaired seven Ruff errors and sixteen strict-mypy errors reproduced on
   a7da665. Added a consumer-owned queue protocol, typed test doubles, adopted
   StrEnum and wrapped long comments/logging/SQL without changing dispatch policy.
@@ -135,21 +135,21 @@ No database/Redis integration beyond tenant/conversation schema, WhatsApp adapte
   remote step. Screenshots expose only exit code 1; remote rerun remains unverified.
 - Next: review/complete the SAH-006 gaps above before SAH-007. No push or deployment.
 
-### 2026-09-16 — Antigravity — SAH-004
+### 2026-09-16 â€” Antigravity â€” SAH-004
 - Did: Created AuditRow with partitioned boundaries and restricted INSERT-only grants. Implemented AuditRepository for transactional event logging. Wrote RedactingFormatter to protect operational logs.
 - Validation: Integration tests prove UPDATE/DELETE are impossible. Unit tests confirm redaction rules work.
 - Decided: Built-in logging.Formatter used rather than importing structural loggers. Partition provisioning procedure encapsulated inside Postgres.
 - Assumed: N/A.
 - Next: SAH-005.
 
-### 2026-09-16 — Antigravity — SAH-003
+### 2026-09-16 â€” Antigravity â€” SAH-003
 - Did: Reviewed uncommitted SAH-003 codebase left by previous agent. Verified acceptance criteria are met. Tests confirm isolation boundaries and RLS protection. Committed the work.
 - Validation: Integration tests passed successfully on Testcontainers Postgres.
 - Decided: Proceed with existing work as it accurately models ADR 0004.
 - Assumed: N/A.
 - Next: SAH-004.
 
-### 2026-09-16 — Codex — SAH-002
+### 2026-09-16 â€” Codex â€” SAH-002
 - Did: accepted the owner's ADR approvals; implemented runnable app, configuration,
   HTTP limits, test suite, lockfile and CI. Updated architecture/standards references.
 - Validation: 15 tests pass; Ruff lint/format, strict mypy (14 files), compilation,
@@ -159,7 +159,7 @@ No database/Redis integration beyond tenant/conversation schema, WhatsApp adapte
 - Assumed: no deployment credentials or account selection from dependency approval.
 - Next: SAH-003. No implementation changes left uncommitted at session completion.
 
-### 2026-09-16 — Codex — SAH-001
+### 2026-09-16 â€” Codex â€” SAH-001
 - Established the documentation-only baseline, eight task files and two ADR proposals.
 - Owner subsequently approved both proposals; deployment requirements remain recorded
   as later prerequisites rather than guessed account choices.
