@@ -95,6 +95,15 @@ Read the relevant docs/tasks file before implementation. Continue on a separate
 No database/Redis integration beyond tenant/conversation schema, WhatsApp adapter, future module stubs, deployment, or reads/changes to the original reference HTML. The remote CI is now fully verified and green. M0 is not yet complete.
 
 ## Session log
+### 2026-09-17 — Typed API client + MSW mock layer (Task 2)
+
+- Did: Authored console/lib/api-client/admin-api.openapi.yaml from the finalized contract (21 endpoints, 26 schemas, all error shapes). Generated typed client via openapi-typescript. Created typed openapi-fetch client with credentials: 'include'. Set up full MSW mock layer: data.ts (in-memory store), 7 handler files (auth, users, tenants, documents, manifest, publish, sandbox), browser/server setup. Added .env.example, format scripts, type-fest @5.9.0 npm override (5.10.0 unpublished from npm).
+- Validation: tsc --noEmit clean, prettier --check clean, eslint clean (0 errors, 0 warnings on source files).
+- Decided: Relative API_BASE_URL default (/api/v1/admin) to avoid CORS in dev; absolute URL via env var for production. Used new HttpResponse(JSON.stringify()) in jsonOk wrapper to avoid MSW JsonBodyType generic constraint.
+- Issues found: type-fest@5.10.0 unpublished from npm registry — pinned to 5.9.0 via package.json overrides. ESLint 'next lint' command hangs on full project scan (slow on first run + large generated types) — lint only source dirs and ignore generated/.
+- Noted: contract doesn't specify GET /manifest or GET /documents list endpoints; added them as reasonable inferences for UI data loading. Flagged for owner confirmation in Task 2 report.
+- Next: Awaiting owner confirmation of contract-derived shapes before Task 3 (actual screens).
+
 ### 2026-09-17 — Control plane UI scaffold begins
 
 - Did: Started the control plane admin portal (`console/`). Refined
