@@ -1,8 +1,8 @@
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import datetime, timedelta
 from uuid import UUID
 
-from sqlalchemy import text, update
+from sqlalchemy import func, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,21 +38,51 @@ class DispatchRepository:
             for row in result.all()
         ]
 
+    async def claim_for_processing(
+        self, tenant_id: UUID, message_id: UUID, claim_token: UUID
+    ) -> int | None:
+        """Only one delivery may acquire an enqueued intent; use database time."""
+        statement = (
+            update(DispatchIntentRow)
+            .where(
+                DispatchIntentRow.tenant_id == tenant_id,
+                DispatchIntentRow.message_id == message_id,
+                DispatchIntentRow.state == DispatchState.ENQUEUED,
+            )
+            .values(
+                state=DispatchState.PROCESSING,
+                claim_token=claim_token,
+                lease_expires_at=func.now() + timedelta(minutes=5),
+            )
+            .returning(DispatchIntentRow.attempts)
+        )
+        return (await self._session.execute(statement)).scalar_one_or_none()
+
     async def update_intent_state(
         self,
         tenant_id: UUID,
         message_id: UUID,
         state: DispatchState,
+        *,
+        claim_token: UUID,
         increment_attempts: bool = False,
         next_attempt_at: datetime | None = None,
     ) -> None:
         statement = (
             update(DispatchIntentRow)
             .where(
-                (DispatchIntentRow.tenant_id == tenant_id)
-                & (DispatchIntentRow.message_id == message_id)
+                DispatchIntentRow.tenant_id == tenant_id,
+                DispatchIntentRow.message_id == message_id,
+                DispatchIntentRow.state == DispatchState.PROCESSING,
+                DispatchIntentRow.claim_token == claim_token,
+                DispatchIntentRow.lease_expires_at > func.now(),
             )
-            .values(state=state, next_attempt_at=next_attempt_at)
+            .values(
+                state=state,
+                next_attempt_at=next_attempt_at,
+                lease_expires_at=None,
+                claim_token=None,
+            )
         )
 
         if increment_attempts:

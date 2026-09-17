@@ -78,7 +78,7 @@ async def test_dispatcher_claims_and_enqueues(
     assert func == "process_intent"
     assert tenant_id == database.tenant_a
     assert enqueued_id == message_id
-    assert job_id == f"intent:{database.tenant_a}:{message_id}"
+    assert job_id.startswith(f"intent:{database.tenant_a}:{message_id}:")
 
     # State should be enqueued
     async with tenant_transaction(database.sessions, database.tenant_a) as session:
@@ -128,17 +128,17 @@ async def test_worker_success(
     async with tenant_transaction(database.sessions, database.tenant_a) as session:
         repo = DispatchRepository(session)
         await repo.enqueue(database.tenant_a, message_id)
-        await repo.update_intent_state(
-            database.tenant_a, message_id, DispatchState.ENQUEUED
-        )
+        await repo.claim_pending_intents()
 
     # Mock processor
     class MockProcessor:
         def __init__(self, sessions: async_sessionmaker[AsyncSession]) -> None:
             pass
 
-        async def process(self, tenant_id: UUID, message_id: UUID) -> None:
-            pass
+        async def process(
+            self, tenant_id: UUID, message_id: UUID, *, idempotency_key: str
+        ) -> None:
+            assert idempotency_key == f"intent:{tenant_id}:{message_id}"
 
     monkeypatch.setattr("app.worker.IntentProcessorService", MockProcessor)
 
@@ -164,15 +164,15 @@ async def test_worker_retryable_failure(
     async with tenant_transaction(database.sessions, database.tenant_a) as session:
         repo = DispatchRepository(session)
         await repo.enqueue(database.tenant_a, message_id)
-        await repo.update_intent_state(
-            database.tenant_a, message_id, DispatchState.ENQUEUED
-        )
+        await repo.claim_pending_intents()
 
     class MockProcessor:
         def __init__(self, sessions: async_sessionmaker[AsyncSession]) -> None:
             pass
 
-        async def process(self, tenant_id: UUID, message_id: UUID) -> None:
+        async def process(
+            self, tenant_id: UUID, message_id: UUID, *, idempotency_key: str
+        ) -> None:
             raise RetryableError("test")
 
     monkeypatch.setattr("app.worker.IntentProcessorService", MockProcessor)
@@ -201,15 +201,15 @@ async def test_worker_terminal_failure(
     async with tenant_transaction(database.sessions, database.tenant_a) as session:
         repo = DispatchRepository(session)
         await repo.enqueue(database.tenant_a, message_id)
-        await repo.update_intent_state(
-            database.tenant_a, message_id, DispatchState.ENQUEUED
-        )
+        await repo.claim_pending_intents()
 
     class MockProcessor:
         def __init__(self, sessions: async_sessionmaker[AsyncSession]) -> None:
             pass
 
-        async def process(self, tenant_id: UUID, message_id: UUID) -> None:
+        async def process(
+            self, tenant_id: UUID, message_id: UUID, *, idempotency_key: str
+        ) -> None:
             raise TerminalError("test")
 
     monkeypatch.setattr("app.worker.IntentProcessorService", MockProcessor)
@@ -237,9 +237,7 @@ async def test_worker_max_retries_exceeded(
     async with tenant_transaction(database.sessions, database.tenant_a) as session:
         repo = DispatchRepository(session)
         await repo.enqueue(database.tenant_a, message_id)
-        await repo.update_intent_state(
-            database.tenant_a, message_id, DispatchState.FAILED_RETRY
-        )
+        await repo.claim_pending_intents()
         # manually set attempts to MAX_ATTEMPTS
         await session.execute(
             update(DispatchIntentRow)
@@ -251,7 +249,9 @@ async def test_worker_max_retries_exceeded(
         def __init__(self, sessions: async_sessionmaker[AsyncSession]) -> None:
             pass
 
-        async def process(self, tenant_id: UUID, message_id: UUID) -> None:
+        async def process(
+            self, tenant_id: UUID, message_id: UUID, *, idempotency_key: str
+        ) -> None:
             raise RetryableError("test")
 
     monkeypatch.setattr("app.worker.IntentProcessorService", MockProcessor)

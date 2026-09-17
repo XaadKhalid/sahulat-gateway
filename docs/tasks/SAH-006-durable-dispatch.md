@@ -16,6 +16,17 @@ Deliver durable dispatch records to arq with safe retries and a framework-free w
 - [ ] Workers persist attempts, retryable failures, terminal failures and review-required states.
 - [ ] Integration tests use real PostgreSQL and Redis where queue guarantees are exercised.
 
+## Processing-lease repair (2026-09-17)
+
+Owner-requested bounded follow-up on `task/SAH-006-processing-leases`:
+
+- [x] Add a reversible lease/token migration and conditional worker ownership.
+- [x] Reclaim expired processing rows; reject unexpired or stale-owner transitions.
+- [x] Test interrupted processing and dispatcher restart against PostgreSQL and
+  real Redis, preserving the logical idempotency key across deliveries.
+- [x] Require the processor's explicit idempotency key; SAH-007 must prove outbound
+  forwarding before merge. Do not claim full SAH-006 completion from this repair.
+
 ## Out of scope
 
 Generic event bus, Celery, Temporal, model orchestration.

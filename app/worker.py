@@ -1,7 +1,7 @@
 import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from arq.connections import RedisSettings
 from arq.cron import cron
@@ -14,7 +14,12 @@ from app.infrastructure.database import create_database_engine, tenant_transacti
 from app.models.dispatch import DispatchState
 from app.repositories.dispatch import DispatchRepository
 from app.services.dispatcher import DispatcherService
-from app.services.processor import IntentProcessorService, RetryableError, TerminalError
+from app.services.processor import (
+    IntentProcessor,
+    IntentProcessorService,
+    RetryableError,
+    TerminalError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,24 +56,36 @@ async def dispatch_pending_cron(ctx: dict[str, Any]) -> None:
 
 
 async def process_intent(
-    ctx: dict[str, Any], tenant_id: UUID, message_id: UUID
+    ctx: dict[str, Any],
+    tenant_id: UUID,
+    message_id: UUID,
+    *,
+    processor: IntentProcessor | None = None,
 ) -> None:
     sessions = ctx["sessions"]
-    processor = IntentProcessorService(sessions)
+    if processor is None:
+        processor = IntentProcessorService(sessions)
 
-    # Mark as processing
+    claim_token = uuid4()
     async with tenant_transaction(sessions, tenant_id) as session:
         repo = DispatchRepository(session)
-        await repo.update_intent_state(tenant_id, message_id, DispatchState.PROCESSING)
+        attempts = await repo.claim_for_processing(tenant_id, message_id, claim_token)
+    if attempts is None:
+        return
 
     try:
-        await processor.process(tenant_id, message_id)
+        await processor.process(
+            tenant_id, message_id, idempotency_key=f"intent:{tenant_id}:{message_id}"
+        )
 
         # Success
         async with tenant_transaction(sessions, tenant_id) as session:
             repo = DispatchRepository(session)
             await repo.update_intent_state(
-                tenant_id, message_id, DispatchState.COMPLETED
+                tenant_id,
+                message_id,
+                DispatchState.COMPLETED,
+                claim_token=claim_token,
             )
 
     except RetryableError as e:
@@ -77,31 +94,19 @@ async def process_intent(
             repo = DispatchRepository(session)
             next_try = datetime.now(UTC) + timedelta(minutes=1)
 
-            from sqlalchemy import select
-
-            from app.models.dispatch import DispatchIntentRow
-
-            intent = (
-                await session.scalars(
-                    select(DispatchIntentRow).where(
-                        DispatchIntentRow.tenant_id == tenant_id,
-                        DispatchIntentRow.message_id == message_id,
-                    )
-                )
-            ).one()
-
-            if intent.attempts >= MAX_ATTEMPTS:
+            if attempts >= MAX_ATTEMPTS:
                 await repo.update_intent_state(
                     tenant_id,
                     message_id,
                     DispatchState.FAILED_TERMINAL,
                     increment_attempts=True,
+                    claim_token=claim_token,
                 )
                 logger.error(
                     "Terminal failure for %s/%s after %s attempts.",
                     tenant_id,
                     message_id,
-                    intent.attempts,
+                    attempts,
                 )
             else:
                 await repo.update_intent_state(
@@ -110,6 +115,7 @@ async def process_intent(
                     DispatchState.FAILED_RETRY,
                     increment_attempts=True,
                     next_attempt_at=next_try,
+                    claim_token=claim_token,
                 )
 
     except TerminalError as e:
@@ -121,6 +127,7 @@ async def process_intent(
                 message_id,
                 DispatchState.FAILED_TERMINAL,
                 increment_attempts=True,
+                claim_token=claim_token,
             )
 
     except Exception as e:
@@ -132,11 +139,14 @@ async def process_intent(
                 message_id,
                 DispatchState.FAILED_TERMINAL,
                 increment_attempts=True,
+                claim_token=claim_token,
             )
         raise
 
 
 class WorkerSettings:
+    # Leave a margin before the five-minute database lease expires.
+    job_timeout = 240
     functions = [process_intent]
     cron_jobs = [cron(dispatch_pending_cron, second=set(range(0, 60, 5)))]
     on_startup = startup

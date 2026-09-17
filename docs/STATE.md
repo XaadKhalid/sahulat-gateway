@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-09-17 by Codex
 **Current milestone:** M0 — Walking skeleton
-**Build status:** SAH-006 commit a7da665 failed GitHub Quality run #14 (owner screenshots). Local Ruff and strict-mypy failures are repaired; remote logs and a remote rerun are unverified. See the latest session log for validation.
+**Build status:** CI lint/type repair is committed in 9b8127b. Processing-lease repair is locally validated below; remote Actions logs and rerun remain unverified.
 
 ## Where the project actually is
 
@@ -21,17 +21,24 @@ modifies a temporary copy and proves a forbidden import is rejected.
 
 ## In progress
 
-Current repair branch: `task/SAH-006-ci-repair`, based on a7da665.
+Current repair branch: `task/SAH-006-processing-leases`, based on 9b8127b.
 The earlier state document lagged behind the committed SAH-005/006 code.
-SAH-006 remains incomplete: the processor is a no-op that the worker can mark
-completed; workers lack a conditional claim/stale-processing recovery; dispatch
-transitions lack audit events. Dispatch tests use a queue fake, not real Redis.
-These require follow-up within SAH-006, not a claim that passing CI completes M0.
+Workers now conditionally claim enqueued work with a five-minute database lease
+and UUID claim token. The dispatcher reclaims expired processing rows, and all
+worker result writes require the matching unexpired token. Redis deliveries use
+fresh queue IDs; the processor receives a stable tenant/message idempotency key.
+The unconfigured processor now fails terminally instead of falsely completing.
+Real PostgreSQL/Redis tests cover interrupted processing and redispatch.
+
+SAH-006 remains incomplete: dispatch transitions lack audit events, lost enqueued
+jobs are not reclaimed, and outage/review-state coverage still needs completion.
+The outbound implementation is SAH-007; its merge gates now explicitly require
+idempotency-key forwarding and safe treatment of uncertain submissions.
 
 ## Next up, in order
 
-1. Complete/review SAH-006 against its task and ADR 0001, including recovery,
-   concurrency, transition audit and real-Redis verification.
+1. Complete/review remaining SAH-006 acceptance criteria, particularly transition
+   audit, lost-enqueued-work recovery, outage and review-state handling.
 2. SAH-007: outbound text echo.
 3. SAH-008: deployment and real-number demonstration.
 
@@ -66,6 +73,13 @@ Read the relevant docs/tasks file before implementation. Continue on a separate
 - The human reference is docs/source/sahulat-solution-design.html, not the filename
   mentioned in AGENTS.md. It is now tracked by prior work and remains unread here.
 - Git metadata writes require sandbox approval here.
+- Drain/stop old workers before migration 0005; do not mix old unfenced workers
+  with new workers. Upgrade expires legacy processing rows for reclamation.
+- Worker job timeout is four minutes and processing lease is five minutes.
+  No heartbeat is implemented; keep bounded M0 processing within this budget.
+- Queue delivery IDs and claim tokens are not outbound idempotency keys. Preserve
+  `intent:<tenant_uuid>:<message_uuid>` across retries. Lease fencing protects
+  database transitions, not external writes; SAH-007 must handle uncertain sends.
 - Provider API contracts and delivery guarantees still require primary-document
   verification during SAH-005/007. No provider exactly-once guarantee is assumed.
 - pytest can hit Windows temp/cache ownership errors. Disable its optional cache
@@ -81,15 +95,34 @@ Read the relevant docs/tasks file before implementation. Continue on a separate
   bounded local probe policy and bootstrap quality gates.
 - [ADR 0004](adr/0004-tenant-persistence.md): accepted tenant-scoped PostgreSQL persistence with Row-Level Security.
 - [ADR 0005](adr/0005-audit-storage.md): accepted declarative PostgreSQL partitioning and strict insert-only database grants for audit logs.
+- [ADR 0006](adr/0006-processing-leases.md): processing leases, fenced results,
+  per-delivery queue IDs and stable outbound idempotency identity.
 
 ## Deliberately not done
 
-This CI repair does not complete dispatch recovery, implement outbound echo,
-deploy, publish a branch, or change the original reference HTML. The owner
+This lease repair does not complete every SAH-006 acceptance criterion, implement
+outbound echo, deploy, publish a branch, or change the original reference HTML. The owner
 declined network escalation to read Actions logs; the remote failed step is
 unknown. M0 is not yet complete.
 
 ## Session log
+
+### 2026-09-17 — Codex — SAH-006 processing leases
+- Did: added reversible migration 0005, processing lease and claim token,
+  conditional ownership and fenced result transitions. Recovery gets a fresh
+  Redis delivery ID while retaining the same explicit processor idempotency key.
+  Replaced the default processor's silent success with explicit terminal failure.
+- Validation: PostgreSQL/Redis tests cover interruption before result transition,
+  unexpired exclusion, reclaim, stable key, duplicate delivery, concurrent claims,
+  stale success/failure fencing, tenant isolation and legacy-row upgrade.
+  Full suite: 68 passed. Ruff lint/format, strict mypy (61 source files),
+  compilation, five import contracts and git diff whitespace checks all pass.
+- Decided: five-minute database lease, four-minute worker timeout, no heartbeat;
+  ADR 0006. No new dependencies or idempotency-key column.
+- Assumed: outbound writes remain disabled until SAH-007 satisfies ADR 0001 and
+  the explicit forwarding/uncertain-send merge gates added to its task.
+- Deliberately left: remaining SAH-006 work listed above, push/merge/deployment,
+  and the owner's pre-existing AGENTS.md filename correction (not staged).
 
 ### 2026-09-17 — Codex — SAH-006 CI repair
 - Did: repaired seven Ruff errors and sixteen strict-mypy errors reproduced on

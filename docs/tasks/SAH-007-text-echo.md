@@ -15,6 +15,13 @@ Wire the text echo service to an injected async WhatsApp client.
 - [ ] Definite failure, uncertain submission, worker crash and stale reply-window cases follow ADR 0001.
 - [ ] Fakes verify service behavior without network; HTTP adapter tests cover provider responses.
 - [ ] No blind retry can send an uncertain submission twice automatically.
+- [ ] Merge gate: forward the processor's required `idempotency_key` unchanged
+      to every retryable outbound write; test that retries/reclaims preserve
+      `intent:<tenant_uuid>:<message_uuid>`. Never substitute the queue delivery
+      ID or claim token. The existing persisted message identity supplies the key.
+- [ ] Merge gate: prove crash-after-submission follows ADR 0001 review handling
+      even when a processing lease expires; an internal key does not establish
+      provider deduplication support.
 
 ## Out of scope
 

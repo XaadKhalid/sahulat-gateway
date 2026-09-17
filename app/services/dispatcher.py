@@ -1,5 +1,5 @@
 from typing import Protocol
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -36,8 +36,9 @@ class DispatcherService:
                 intents = await repo.claim_pending_intents(batch_size=self._batch_size)
 
                 for intent in intents:
-                    # Enqueue to Arq using deterministic job ID to prevent duplicates
-                    job_id = f"intent:{intent.tenant_id}:{intent.message_id}"
+                    # Recovery must not collide with a retained Redis job/result.
+                    # Database claims fence deliveries; logical identity stays stable.
+                    job_id = f"intent:{intent.tenant_id}:{intent.message_id}:{uuid4()}"
 
                     # We pass tenant_id and message_id as strings or UUIDs
                     await self._redis.enqueue_job(

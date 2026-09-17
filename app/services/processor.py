@@ -1,3 +1,4 @@
+from typing import Protocol
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -11,11 +12,18 @@ class TerminalError(Exception):
     """Exception indicating the processing failed fatally."""
 
 
+class IntentProcessor(Protocol):
+    async def process(
+        self, tenant_id: UUID, message_id: UUID, *, idempotency_key: str
+    ) -> None: ...
+
+
 class IntentProcessorService:
     def __init__(self, sessions: async_sessionmaker[AsyncSession]) -> None:
         self._sessions = sessions
 
-    async def process(self, tenant_id: UUID, message_id: UUID) -> None:
-        """Process the intent framework-free. For now, it's a stub."""
-        # The real implementation will invoke the TurnLoop.
-        pass
+    async def process(
+        self, tenant_id: UUID, message_id: UUID, *, idempotency_key: str
+    ) -> None:
+        """SAH-007 must forward this stable key to every retryable outbound write."""
+        raise TerminalError("Outbound processor is not configured")
