@@ -48,8 +48,9 @@ class DummyRedis:
 
     async def enqueue_job(
         self, function: str, tenant_id: UUID, message_id: UUID, *, _job_id: str
-    ) -> None:
+    ) -> object:
         self.enqueued.append((function, tenant_id, message_id, _job_id))
+        return object()
 
 
 @pytest.fixture
@@ -229,7 +230,7 @@ async def test_worker_terminal_failure(
         assert intent.attempts == 1
 
 
-async def test_worker_max_retries_exceeded(
+async def test_worker_exhausted_retries_require_review(
     database: Database, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     message_id = uuid4()
@@ -242,7 +243,7 @@ async def test_worker_max_retries_exceeded(
         await session.execute(
             update(DispatchIntentRow)
             .where(DispatchIntentRow.message_id == message_id)
-            .values(attempts=MAX_ATTEMPTS)
+            .values(attempts=MAX_ATTEMPTS - 1)
         )
 
     class MockProcessor:
@@ -267,5 +268,5 @@ async def test_worker_max_retries_exceeded(
                 )
             )
         ).one()
-        assert intent.state == DispatchState.FAILED_TERMINAL
-        assert intent.attempts == MAX_ATTEMPTS + 1
+        assert intent.state == DispatchState.REVIEW_REQUIRED
+        assert intent.attempts == MAX_ATTEMPTS

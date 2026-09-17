@@ -71,7 +71,10 @@ class IngressService:
                                     occurred_at=datetime.now(UTC),
                                     event_type="message.received",
                                     actor="customer",
-                                    details={"channel": "whatsapp"},
+                                    details={
+                                        "channel": "whatsapp",
+                                        "message_id": str(save_result.message.id),
+                                    },
                                 )
                             )
 

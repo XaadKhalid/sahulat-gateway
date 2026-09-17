@@ -12,6 +12,10 @@ class TerminalError(Exception):
     """Exception indicating the processing failed fatally."""
 
 
+class ReviewRequiredError(Exception):
+    """Outcome is uncertain or requires operator intervention; never auto-retry."""
+
+
 class IntentProcessor(Protocol):
     async def process(
         self, tenant_id: UUID, message_id: UUID, *, idempotency_key: str

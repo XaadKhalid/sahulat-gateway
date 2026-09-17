@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
-from sqlalchemy import DateTime, Enum, ForeignKeyConstraint, Integer, text
+from sqlalchemy import DateTime, Enum, ForeignKeyConstraint, Integer, String, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -50,3 +50,4 @@ class DispatchIntentRow(Base):
     )
     lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     claim_token: Mapped[UUID | None] = mapped_column()
+    state_reason: Mapped[str] = mapped_column(String(100), server_default="created")

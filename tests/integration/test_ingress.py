@@ -90,8 +90,11 @@ async def test_ingress_processes_valid_message_atomically(
                 select(AuditRow).where(AuditRow.tenant_id == database.tenant_a)
             )
         ).all()
-        assert len(audits) == 1
-        assert audits[0].event_type == "message.received"
+        assert {audit.event_type for audit in audits} == {
+            "message.received",
+            "dispatch.transition",
+        }
+        assert len(audits) == 2
 
         # Dispatch intent inserted
         dispatches = (

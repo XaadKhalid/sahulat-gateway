@@ -1,7 +1,6 @@
 import logging
-from datetime import UTC, datetime, timedelta
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from arq.connections import RedisSettings
 from arq.cron import cron
@@ -10,20 +9,13 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from app.core.config import DatabaseSettings
 from app.core.config import RedisSettings as AppRedisSettings
 from app.core.redis import get_redis_pool
-from app.infrastructure.database import create_database_engine, tenant_transaction
-from app.models.dispatch import DispatchState
-from app.repositories.dispatch import DispatchRepository
+from app.infrastructure.database import create_database_engine
 from app.services.dispatcher import DispatcherService
-from app.services.processor import (
-    IntentProcessor,
-    IntentProcessorService,
-    RetryableError,
-    TerminalError,
-)
+from app.services.intent_worker import MAX_ATTEMPTS as MAX_ATTEMPTS
+from app.services.intent_worker import IntentWorker
+from app.services.processor import IntentProcessor, IntentProcessorService
 
 logger = logging.getLogger(__name__)
-
-MAX_ATTEMPTS = 5
 
 
 async def startup(ctx: dict[str, Any]) -> None:
@@ -66,82 +58,7 @@ async def process_intent(
     if processor is None:
         processor = IntentProcessorService(sessions)
 
-    claim_token = uuid4()
-    async with tenant_transaction(sessions, tenant_id) as session:
-        repo = DispatchRepository(session)
-        attempts = await repo.claim_for_processing(tenant_id, message_id, claim_token)
-    if attempts is None:
-        return
-
-    try:
-        await processor.process(
-            tenant_id, message_id, idempotency_key=f"intent:{tenant_id}:{message_id}"
-        )
-
-        # Success
-        async with tenant_transaction(sessions, tenant_id) as session:
-            repo = DispatchRepository(session)
-            await repo.update_intent_state(
-                tenant_id,
-                message_id,
-                DispatchState.COMPLETED,
-                claim_token=claim_token,
-            )
-
-    except RetryableError as e:
-        logger.warning(f"Retryable failure for {tenant_id}/{message_id}: {e}")
-        async with tenant_transaction(sessions, tenant_id) as session:
-            repo = DispatchRepository(session)
-            next_try = datetime.now(UTC) + timedelta(minutes=1)
-
-            if attempts >= MAX_ATTEMPTS:
-                await repo.update_intent_state(
-                    tenant_id,
-                    message_id,
-                    DispatchState.FAILED_TERMINAL,
-                    increment_attempts=True,
-                    claim_token=claim_token,
-                )
-                logger.error(
-                    "Terminal failure for %s/%s after %s attempts.",
-                    tenant_id,
-                    message_id,
-                    attempts,
-                )
-            else:
-                await repo.update_intent_state(
-                    tenant_id,
-                    message_id,
-                    DispatchState.FAILED_RETRY,
-                    increment_attempts=True,
-                    next_attempt_at=next_try,
-                    claim_token=claim_token,
-                )
-
-    except TerminalError as e:
-        logger.error(f"Terminal failure for {tenant_id}/{message_id}: {e}")
-        async with tenant_transaction(sessions, tenant_id) as session:
-            repo = DispatchRepository(session)
-            await repo.update_intent_state(
-                tenant_id,
-                message_id,
-                DispatchState.FAILED_TERMINAL,
-                increment_attempts=True,
-                claim_token=claim_token,
-            )
-
-    except Exception as e:
-        logger.exception(f"Unexpected failure for {tenant_id}/{message_id}: {e}")
-        async with tenant_transaction(sessions, tenant_id) as session:
-            repo = DispatchRepository(session)
-            await repo.update_intent_state(
-                tenant_id,
-                message_id,
-                DispatchState.FAILED_TERMINAL,
-                increment_attempts=True,
-                claim_token=claim_token,
-            )
-        raise
+    await IntentWorker(sessions, processor).process(tenant_id, message_id)
 
 
 class WorkerSettings:

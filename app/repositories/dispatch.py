@@ -48,11 +48,13 @@ class DispatchRepository:
                 DispatchIntentRow.tenant_id == tenant_id,
                 DispatchIntentRow.message_id == message_id,
                 DispatchIntentRow.state == DispatchState.ENQUEUED,
+                DispatchIntentRow.lease_expires_at > func.now(),
             )
             .values(
                 state=DispatchState.PROCESSING,
                 claim_token=claim_token,
                 lease_expires_at=func.now() + timedelta(minutes=5),
+                state_reason="worker_claimed",
             )
             .returning(DispatchIntentRow.attempts)
         )
@@ -67,6 +69,7 @@ class DispatchRepository:
         claim_token: UUID,
         increment_attempts: bool = False,
         next_attempt_at: datetime | None = None,
+        reason: str | None = None,
     ) -> None:
         statement = (
             update(DispatchIntentRow)
@@ -82,6 +85,7 @@ class DispatchRepository:
                 next_attempt_at=next_attempt_at,
                 lease_expires_at=None,
                 claim_token=None,
+                state_reason=reason or state.value,
             )
         )
 
