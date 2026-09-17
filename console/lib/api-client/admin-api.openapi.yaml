@@ -1,0 +1,868 @@
+openapi: 3.1.0
+info:
+  title: Sahulat Gateway Admin API
+  description: |
+    Admin API contract for the control plane (console/).
+    Single source of truth: docs/admin-api-contract.md.
+    Base path: /api/v1/admin.
+    All requests require an authenticated portal-staff session (httpOnly cookie).
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8000/api/v1/admin
+    description: Local development backend
+
+# ---------------------------------------------------------------------------
+# Shared schemas
+# ---------------------------------------------------------------------------
+
+components:
+  schemas:
+    # --- Error responses ---
+    Error:
+      type: object
+      required: [detail, type]
+      properties:
+        detail:
+          type: string
+          description: Human-readable message.
+        type:
+          type: string
+          description: Stable machine-readable error code.
+        violations:
+          type: array
+          items:
+            type: string
+          description: >-
+            Optional list of specific precondition violations. Present on
+            errors (such as 409 publish precondition failures) that carry a
+            list of reasons the UI must surface.
+    ValidationError:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationErrorDetail'
+          description: >-
+            FastAPI standard field-level validation errors. This is the only
+            shape where `detail` is an array rather than a string.
+    ValidationErrorDetail:
+      type: object
+      required: [loc, msg, type]
+      properties:
+        loc:
+          type: array
+          items:
+            type: string
+          description: Location in the request (e.g. ["body", "field_name"]).
+        msg:
+          type: string
+          description: Human-readable error message.
+        type:
+          type: string
+          description: Error type identifier.
+
+    # --- Auth ---
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    MeResponse:
+      type: object
+      required: [id, email, role]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [admin, operator]
+
+    # --- Users (Screen 1) ---
+    Role:
+      type: string
+      enum: [admin, operator]
+      description: Portal staff roles.
+
+    User:
+      type: object
+      required: [id, email, role, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        role:
+          $ref: '#/components/schemas/Role'
+        created_at:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp.
+
+    UserList:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        next_cursor:
+          oneOf:
+            - type: string
+            - type: null
+          description: Opaque cursor for the next page, or null if no more.
+
+    CreateUserRequest:
+      type: object
+      required: [email, role]
+      properties:
+        email:
+          type: string
+          format: email
+        role:
+          $ref: '#/components/schemas/Role'
+
+    UpdateUserRoleRequest:
+      type: object
+      required: [role]
+      properties:
+        role:
+          $ref: '#/components/schemas/Role'
+
+    # --- Tenants (Screen 2) ---
+    TenantStatus:
+      type: string
+      enum: [draft, connecting, live, suspended]
+
+    Tenant:
+      type: object
+      required: [id, name, status, whatsapp_connected, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        status:
+          $ref: '#/components/schemas/TenantStatus'
+        whatsapp_connected:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    TenantList:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tenant'
+        next_cursor:
+          oneOf:
+            - type: string
+            - type: null
+
+    CreateTenantRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+
+    TenantDetail:
+      type: object
+      required:
+        [id, name, status, whatsapp_connected, created_at, document_count, manifest_status, policy]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        status:
+          $ref: '#/components/schemas/TenantStatus'
+        whatsapp_connected:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        document_count:
+          type: integer
+          minimum: 0
+        manifest_status:
+          type: string
+          enum: [pending, present, invalid]
+          description: >-
+            Whether a manifest has been stored and whether it last validated.
+        policy:
+          type: object
+          description: Tenant-specific policy settings (opaque to the UI).
+          additionalProperties: true
+
+    UpdateTenantRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        policy:
+          type: object
+          additionalProperties: true
+
+    # --- Documents (Screen 2) ---
+    DocumentStatus:
+      type: string
+      enum: [processing, ready, failed]
+
+    Document:
+      type: object
+      required: [document_id, filename, status, created_at]
+      properties:
+        document_id:
+          type: string
+          format: uuid
+        filename:
+          type: string
+        status:
+          $ref: '#/components/schemas/DocumentStatus'
+        created_at:
+          type: string
+          format: date-time
+
+    DocumentList:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Document'
+        next_cursor:
+          oneOf:
+            - type: string
+            - type: null
+
+    UploadDocumentRequest:
+      type: object
+      required: [file]
+      properties:
+        file:
+          type: string
+          format: binary
+          description: Multipart file upload.
+
+    # --- Publish (Screen 2) ---
+    PublishPreconditions:
+      type: array
+      items:
+        type: string
+      description: >-
+        List of unmet preconditions returned with 409. The UI renders this list
+        and does not duplicate the check client-side.
+
+    # --- Sandbox (Screen 3) ---
+    Tier:
+      type: string
+      enum: [anonymous, known, verified, privileged]
+
+    ToolCall:
+      type: object
+      required: [name, args, result]
+      properties:
+        name:
+          type: string
+          description: Tool name as invoked by the orchestrator.
+        args:
+          type: object
+          description: Tool arguments (opaque JSON from tenant-defined tools).
+          additionalProperties: true
+        result:
+          type: object
+          description: Tool execution result (opaque JSON, tenant-defined).
+          additionalProperties: true
+
+    RetrievedChunk:
+      type: object
+      required: [source, excerpt]
+      properties:
+        source:
+          type: string
+          description: Document source identifier.
+        excerpt:
+          type: string
+          description: Text excerpt from the retrieved document.
+
+    SandboxMessageResponse:
+      type: object
+      required: [session_id, reply, tool_calls, retrieved_chunks, tier]
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        reply:
+          type: string
+        tool_calls:
+          type: array
+          items:
+            $ref: '#/components/schemas/ToolCall'
+        retrieved_chunks:
+          type: array
+          items:
+            $ref: '#/components/schemas/RetrievedChunk'
+        tier:
+          $ref: '#/components/schemas/Tier'
+
+    SandboxMessageRequest:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+        session_id:
+          type: string
+          format: uuid
+          description: Optional existing session to continue. If omitted, a new session is created.
+
+  responses:
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Authentication required (401).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Insufficient role for this operation (403).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ValidationError:
+      description: Request validation failed (422).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: session
+      description: >-
+        httpOnly session cookie set by POST /auth/login. The frontend does not
+        handle tokens directly; subsequent requests include the cookie via
+        credentials: 'include' (browser) or cookie forwarding (server components).
+
+paths:
+  # ===========================================================================
+  # Auth
+  # ===========================================================================
+  /auth/login:
+    post:
+      operationId: login
+      summary: Authenticate portal staff and set session cookie
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful; httpOnly session cookie is set.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/logout:
+    post:
+      operationId: logout
+      summary: Clear the current session
+      responses:
+        '204':
+          description: Session cleared.
+
+  /auth/me:
+    get:
+      operationId: getMe
+      summary: Get the current portal staff member
+      responses:
+        '200':
+          description: Current session user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ===========================================================================
+  # Screen 1 — Users (portal staff accounts)
+  # ===========================================================================
+  /users:
+    get:
+      operationId: listUsers
+      summary: List portal staff users (paginated)
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - in: query
+          name: cursor
+          schema:
+            type: string
+            description: Opaque cursor from a previous page's next_cursor.
+      responses:
+        '200':
+          description: Paginated list of users.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      operationId: createUser
+      summary: Create a portal staff user (invite-based)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User created and invite emailed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '409':
+          description: User with this email already exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /users/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+    patch:
+      operationId: updateUserRole
+      summary: Change a user's role (role change only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRoleRequest'
+      responses:
+        '200':
+          description: Updated user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '409':
+          description: Self-demotion leaving zero admins.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      operationId: deleteUser
+      summary: Deactivate a user (no hard-delete)
+      responses:
+        '204':
+          description: User deactivated.
+        '409':
+          description: Cannot deactivate (e.g. self, or last admin).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ===========================================================================
+  # Screen 2 — Business profile management (tenants)
+  # ===========================================================================
+  /tenants:
+    get:
+      operationId: listTenants
+      summary: List tenants (paginated)
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - in: query
+          name: cursor
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated list of tenants.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      operationId: createTenant
+      summary: Create a tenant in draft status
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTenantRequest'
+      responses:
+        '201':
+          description: Tenant created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tenant'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /tenants/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getTenant
+      summary: Get full tenant detail
+      responses:
+        '200':
+          description: Full tenant detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateTenant
+      summary: Partial update of name or policy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTenantRequest'
+      responses:
+        '200':
+          description: Updated tenant detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /tenants/{id}/whatsapp/connect:
+    post:
+      operationId: connectWhatsapp
+      summary: Start WhatsApp WABA embedded signup flow
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: >-
+            Response shape depends on Meta's embedded signup integration,
+            to be defined when SAH-005 clarifies what's available server-side.
+          content:
+            application/json:
+              schema:
+                type: object
+                description: >-
+                  Placeholder — shape TBD. The UI must not assume a specific
+                  structure here.
+                properties:
+                  redirect_url:
+                    type: string
+                    description: >-
+                      If defined, the UI redirects the operator to this URL.
+                      Treat as informational until the real shape is specified.
+                    nullable: true
+                additionalProperties: true
+        '409':
+          description: WhatsApp already connected or tenant not in a connectable state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /tenants/{id}/documents:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: listDocuments
+      summary: List a tenant's documents with status
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - in: query
+          name: cursor
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated list of documents.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentList'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      operationId: uploadDocument
+      summary: Upload a document (multipart)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UploadDocumentRequest'
+      responses:
+        '201':
+          description: Document accepted and processing.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /tenants/{id}/documents/{document_id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: document_id
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getDocument
+      summary: Get a document's current status
+      responses:
+        '200':
+          description: Document with current status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteDocument
+      summary: Delete a tenant's document
+      responses:
+        '204':
+          description: Document deleted.
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /tenants/{id}/manifest:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      operationId: upsertManifest
+      summary: Replace the tenant's manifest (raw OpenAPI YAML)
+      requestBody:
+        required: true
+        content:
+          application/yaml:
+            schema:
+              type: string
+              description: >-
+                Raw OpenAPI 3.1 YAML document as a text string, including
+                x-agent annotations. Server-side validation must use the same
+                code path as actions/manifest.py — not a separate
+                UI-facing validator.
+      responses:
+        '204':
+          description: Manifest accepted and stored.
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    get:
+      operationId: getManifest
+      summary: Retrieve the tenant's current manifest
+      responses:
+        '200':
+          description: >-
+            Manifest as a raw YAML string. Returns 404 if not present.
+          content:
+            application/yaml:
+              schema:
+                type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /tenants/{id}/publish:
+    post:
+      operationId: publishTenant
+      summary: Publish a tenant (draft → live)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Tenant published.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tenant'
+        '409':
+          description: >-
+            Unmet preconditions. The UI renders the violations list and does
+            not duplicate the check client-side.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ===========================================================================
+  # Screen 3 — Sandbox chat window
+  # ===========================================================================
+  /tenants/{id}/sandbox/messages:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: sendMessage
+      summary: Run a message through the turn loop (synthetic channel)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SandboxMessageRequest'
+      responses:
+        '200':
+          description: Full orchestrator result envelope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SandboxMessageResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /tenants/{id}/sandbox/reset:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: resetSandbox
+      summary: Clear sandbox session state (fresh anonymous tier)
+      responses:
+        '204':
+          description: Sandbox reset.
+
+security:
+  - cookieAuth: []

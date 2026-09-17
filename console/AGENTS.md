@@ -49,7 +49,10 @@ entry by loosening your own types.
 
 ## Stack
 
-- **Next.js 15**, App Router, TypeScript strict.
+- **Next.js 16**, App Router, TypeScript strict. Async request APIs
+  (`params`, `searchParams`, `cookies()`, `headers()`) have no synchronous
+  fallback in 16 — always `await` them. Turbopack is the default bundler;
+  don't reintroduce a webpack config. `middleware.ts` is `proxy.ts` in 16.
 - **Tailwind CSS** + **shadcn/ui** for components — matches the original
   solution design and keeps the surface small and consistent rather than
   hand-rolling UI primitives.
