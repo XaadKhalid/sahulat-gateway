@@ -48,7 +48,7 @@ Full detail lives in:
 - `docs/engineering-standards.md` — the code quality bar (non-negotiable)
 - `docs/STATE.md` — where the project actually is right now
 - `docs/adr/` — why things are the way they are
-- `docs/source/solution-design.html` — original vision doc, human reference only.
+- `docs/source/sahulat-solution-design.html` — original vision doc, human reference only.
   **Do not load it into context.** It is aspirational and much of it is
   deliberately deferred. `docs/` is authoritative; that file is not.
 
