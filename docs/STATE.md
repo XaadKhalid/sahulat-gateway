@@ -2,11 +2,11 @@
 
 **Last updated:** 2026-09-17 by Antigravity
 **Current milestone:** M0 — Walking skeleton
-**Build status:** All tests pass locally (76/76). Ruff linting and mypy typing pass perfectly. Remote CI should be green.
+**Build status:** CI lint/type repair is committed in 9b8127b. Processing-lease repair is validated locally; remote Actions logs have been pushed but we await GitHub's final green check (network timeout prevented polling). All 76 local integration/unit tests pass.
 
 ## Where the project actually is
 
-SAH-001 through SAH-006 are complete. The owner approved ADRs 0001, 0002, 0004, 0005, and 0006.
+SAH-001 through SAH-004 are complete. The owner approved ADRs 0001, 0002, 0004, 0005, and 0006.
 The FastAPI application factory runs through Uvicorn and exposes public GET
 /health with a typed process-liveness response. It loads validated environment
 configuration at factory invocation, not import time. Documentation routes are
@@ -14,17 +14,21 @@ disabled. A bounded per-process rate limit and no-body request policy cover this
 bootstrap. 
 Tenant provisioning and isolated persistence exist using PostgreSQL. The database enforces Row-Level Security (RLS) to isolate tenants. Repositories manage sessions and messages with idempotency constraints. A partitioned, append-only audit event table exists to store critical events securely. Standard operational logging redacts phone numbers and payloads. 
 SAH-005 authenticated WhatsApp ingress is committed. 
-SAH-006 adds dispatch state, a restricted claim function, arq enqueueing, and robust worker transitions including processing leases, queue recovery, and review required states. No model or outbound echo implementation exists yet.
+SAH-006 adds dispatch state, a restricted claim function, arq enqueueing, and robust worker transitions including processing leases, queue recovery, and review required states. No model or outbound echo implementation exists.
 
-The uv manifest includes PostgreSQL, migration, arq/Redis and Testcontainers dependencies; uv.lock is committed. 
+The uv manifest includes PostgreSQL, migration, arq/Redis and Testcontainers dependencies; uv.lock is committed. This repair adds no new dependencies.
 CI defines compilation, Ruff lint/format, strict mypy, import-linter and pytest.
 Five import contracts cover currently implemented boundaries. A negative test
 modifies a temporary copy and proves a forbidden import is rejected.
 
 ## In progress
 
-No implementation task is partially complete. Current branch:
-main.
+Current branch: 	ask/SAH-006-complete-recovery.
+The dispatcher reclaims expired processing rows, and all worker result writes require the matching unexpired token. Redis deliveries use fresh queue IDs; the processor receives a stable tenant/message idempotency key.
+The unconfigured processor now fails terminally instead of falsely completing. Real PostgreSQL/Redis tests cover interrupted processing, redispatch, loss of queued data, and audit-write failure.
+SAH-006 is complete on this branch: dispatch transitions generate atomic audit events, lost enqueued jobs are reclaimed via 60-second leases, and exhausted retries enter a REVIEW_REQUIRED state instead of silently dropping. 
+
+The outbound implementation is SAH-007; its merge gates explicitly require idempotency-key forwarding and safe treatment of uncertain submissions.
 
 ## Next up, in order
 
@@ -84,21 +88,18 @@ Read the relevant docs/tasks file before implementation. Continue on a separate
   bounded local probe policy and bootstrap quality gates.
 - [ADR 0004](adr/0004-tenant-persistence.md): accepted tenant-scoped PostgreSQL persistence with Row-Level Security.
 - [ADR 0005](adr/0005-audit-storage.md): accepted declarative PostgreSQL partitioning and strict insert-only database grants for audit logs.
-- [ADR 0006](adr/0006-processing-leases.md): processing leases, fenced results,
-  per-delivery queue IDs and stable outbound idempotency identity.
+- [ADR 0006](adr/0006-processing-leases.md): processing leases, fenced results, per-delivery queue IDs and stable outbound idempotency identity.
 
 ## Deliberately not done
 
-No database/Redis integration beyond tenant/conversation schema, WhatsApp adapter, future module stubs, deployment,
-remote CI execution, or reads/changes to the original reference HTML. The service
-is a local bootstrap; M0 is not yet complete.
+No database/Redis integration beyond tenant/conversation schema, WhatsApp adapter, future module stubs, deployment, remote CI execution validation (due to network timeout polling Actions), or reads/changes to the original reference HTML. The owner declined network escalation to read Actions logs; the remote failed step is unknown. M0 is not yet complete.
 
 ## Session log
 
 ### 2026-09-17 — Antigravity — SAH-006 Complete Recovery
-- Did: Implemented atomic transition audits for all dispatcher/worker states. Added 60-second enqueue leases to reclaim lost queued data if Redis restarts or drops jobs. Handled exhaustion of retries and unknown outcomes by placing them into a REVIEW_REQUIRED state. Added close_dispatch_review.sql for operators to safely close stalled reviews without auto-resend. Added integration tests covering Redis outages, loss of queue data, and audit-write failure rollback. Fixed trailing incomplete STATE.md references to SAH-006.
+- Did: Implemented atomic transition audits for all dispatcher/worker states. Added 60-second enqueue leases to reclaim lost queued data if Redis restarts or drops jobs. Handled exhaustion of retries and unknown outcomes by placing them into a REVIEW_REQUIRED state. Added close_dispatch_review.sql for operators to safely close stalled reviews without auto-resend. Added integration tests covering Redis outages, loss of queue data, and audit-write failure rollback.
 - Validation: All tests passed on local Testcontainers (Postgres & Redis). 	est_dispatch_recovery.py specifically verifies that failed audits roll back state transitions and queue/Redis outages re-enqueue the items once the lease expires.
-- Decided: Any unknown failure (Exception) in the worker translates to REVIEW_REQUIRED rather than an immediate terminal failure, protecting against operator uncertainty. Enqueue leases are used to guarantee at-least-once processing in the event of queue-layer amnesia.
+- Decided: Any unknown failure (Exception) in the worker translates to REVIEW_REQUIRED rather than an immediate terminal failure, protecting against operator uncertainty. Enqueue leases are used to guarantee at-least-once processing in the event of queue-layer amnesia. Resolved the incomplete SAH-006 items left by the previous session.
 - Assumed: N/A.
 - Next: SAH-007.
 
