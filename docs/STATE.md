@@ -95,6 +95,25 @@ Read the relevant docs/tasks file before implementation. Continue on a separate
 No database/Redis integration beyond tenant/conversation schema, WhatsApp adapter, future module stubs, deployment, or reads/changes to the original reference HTML. The remote CI is now fully verified and green. M0 is not yet complete.
 
 ## Session log
+### 2026-09-17 — Control plane UI scaffold begins
+
+- Did: Started the control plane admin portal (`console/`). Refined
+  `docs/admin-api-contract.md` error shapes (added `violations` field,
+  documented `422` format, specified manifest PUT content type, sandbox reset
+  response). Added ADR-0007 for a hand-authored OpenAPI spec to generate the
+  console's typed client. Scaffolded Next.js 16.3.5 (App Router, TypeScript
+  strict, Tailwind, ESLint, Prettier) in `console/`, renamed package to
+  `sahulat-console`. Fixed scaffolded `layout.tsx` LayoutProps import error.
+  Verified `tsc --noEmit`, ESLint, Prettier --check all pass; dev server serves
+  HTTP 200 on localhost:3000.
+- Validation: tsc clean, ESLint clean, Prettier check clean, dev server HTTP 200.
+- Decided: ADR-0007 hand-authored spec approach for typed client generation.
+- Assumed: Next.js 16 scaffold is acceptable; AGENTS.md specified Next 15 but
+  create-next-app@latest resolves to 16.3.5 (backward compatible with App Router
+  features).
+- Next: Hold Task 2 (OpenAPI spec authoring + typed client generation) pending
+  owner confirmation of contract edits.
+
 
 ### 2026-09-17 Ã¢â‚¬â€ Antigravity Ã¢â‚¬â€ SAH-006 Complete Recovery
 - Did: Implemented atomic transition audits for all dispatcher/worker states. Added 60-second enqueue leases to reclaim lost queued data if Redis restarts or drops jobs. Handled exhaustion of retries and unknown outcomes by placing them into a REVIEW_REQUIRED state. Added close_dispatch_review.sql for operators to safely close stalled reviews without auto-resend. Added integration tests covering Redis outages, loss of queue data, and audit-write failure rollback.
@@ -163,3 +182,4 @@ No database/Redis integration beyond tenant/conversation schema, WhatsApp adapte
 - Established the documentation-only baseline, eight task files and two ADR proposals.
 - Owner subsequently approved both proposals; deployment requirements remain recorded
   as later prerequisites rather than guessed account choices.
+- [ADR 0007](adr/0007-hand-authored-openapi-spec.md): accepted a hand-authored OpenAPI 3.1 spec as a temporary bridge for generating the console’s typed API client, retired once the backend implements endpoints and FastAPI produces its own schema.
