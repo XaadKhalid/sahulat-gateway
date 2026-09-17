@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.infrastructure.database import tenant_transaction
 from app.models.conversations import MessageRow, SessionRow
@@ -15,7 +16,7 @@ from app.worker import MAX_ATTEMPTS, process_intent
 from tests.integration.conftest import Database
 
 
-async def insert_test_message(database: Database, message_id: UUID):
+async def insert_test_message(database: Database, message_id: UUID) -> None:
     session_id = uuid4()
     async with tenant_transaction(database.sessions, database.tenant_a) as session:
         session.add(
@@ -42,15 +43,17 @@ async def insert_test_message(database: Database, message_id: UUID):
 
 # Fake Redis pool for testing dispatcher enqueuing
 class DummyRedis:
-    def __init__(self):
-        self.enqueued = []
+    def __init__(self) -> None:
+        self.enqueued: list[tuple[str, UUID, UUID, str]] = []
 
-    async def enqueue_job(self, function: str, *args, **kwargs):
-        self.enqueued.append((function, args, kwargs))
+    async def enqueue_job(
+        self, function: str, tenant_id: UUID, message_id: UUID, *, _job_id: str
+    ) -> None:
+        self.enqueued.append((function, tenant_id, message_id, _job_id))
 
 
 @pytest.fixture
-def dummy_redis():
+def dummy_redis() -> DummyRedis:
     return DummyRedis()
 
 
@@ -71,11 +74,11 @@ async def test_dispatcher_claims_and_enqueues(
     assert dispatched == 1
     assert len(dummy_redis.enqueued) == 1
 
-    func, args, kwargs = dummy_redis.enqueued[0]
+    func, tenant_id, enqueued_id, job_id = dummy_redis.enqueued[0]
     assert func == "process_intent"
-    assert args[0] == database.tenant_a
-    assert args[1] == message_id
-    assert kwargs["_job_id"] == f"intent:{database.tenant_a}:{message_id}"
+    assert tenant_id == database.tenant_a
+    assert enqueued_id == message_id
+    assert job_id == f"intent:{database.tenant_a}:{message_id}"
 
     # State should be enqueued
     async with tenant_transaction(database.sessions, database.tenant_a) as session:
@@ -113,7 +116,7 @@ async def test_concurrent_dispatchers_do_not_duplicate(
     assert len(dummy_redis.enqueued) == 10
 
     # Check all are unique
-    enqueued_msg_ids = {args[1] for func, args, kwargs in dummy_redis.enqueued}
+    enqueued_msg_ids = {message_id for _, _, message_id, _ in dummy_redis.enqueued}
     assert len(enqueued_msg_ids) == 10
 
 
@@ -131,10 +134,10 @@ async def test_worker_success(
 
     # Mock processor
     class MockProcessor:
-        def __init__(self, *args, **kwargs):
+        def __init__(self, sessions: async_sessionmaker[AsyncSession]) -> None:
             pass
 
-        async def process(self, tenant_id, message_id):
+        async def process(self, tenant_id: UUID, message_id: UUID) -> None:
             pass
 
     monkeypatch.setattr("app.worker.IntentProcessorService", MockProcessor)
@@ -166,10 +169,10 @@ async def test_worker_retryable_failure(
         )
 
     class MockProcessor:
-        def __init__(self, *args, **kwargs):
+        def __init__(self, sessions: async_sessionmaker[AsyncSession]) -> None:
             pass
 
-        async def process(self, tenant_id, message_id):
+        async def process(self, tenant_id: UUID, message_id: UUID) -> None:
             raise RetryableError("test")
 
     monkeypatch.setattr("app.worker.IntentProcessorService", MockProcessor)
@@ -203,10 +206,10 @@ async def test_worker_terminal_failure(
         )
 
     class MockProcessor:
-        def __init__(self, *args, **kwargs):
+        def __init__(self, sessions: async_sessionmaker[AsyncSession]) -> None:
             pass
 
-        async def process(self, tenant_id, message_id):
+        async def process(self, tenant_id: UUID, message_id: UUID) -> None:
             raise TerminalError("test")
 
     monkeypatch.setattr("app.worker.IntentProcessorService", MockProcessor)
@@ -245,10 +248,10 @@ async def test_worker_max_retries_exceeded(
         )
 
     class MockProcessor:
-        def __init__(self, *args, **kwargs):
+        def __init__(self, sessions: async_sessionmaker[AsyncSession]) -> None:
             pass
 
-        async def process(self, tenant_id, message_id):
+        async def process(self, tenant_id: UUID, message_id: UUID) -> None:
             raise RetryableError("test")
 
     monkeypatch.setattr("app.worker.IntentProcessorService", MockProcessor)

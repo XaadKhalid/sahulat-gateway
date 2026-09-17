@@ -75,17 +75,8 @@ async def process_intent(
         logger.warning(f"Retryable failure for {tenant_id}/{message_id}: {e}")
         async with tenant_transaction(sessions, tenant_id) as session:
             repo = DispatchRepository(session)
-            # For this simple retry strategy, delay 1 minute * attempt count
-            # The attempts count will be incremented inside update_intent_state
-            # Wait, we need to know the attempts count to set the delay, or just fixed delay
             next_try = datetime.now(UTC) + timedelta(minutes=1)
 
-            # Check if we should move to terminal instead
-            # We could fetch the row first, but let's just let the repository handle increment
-            # Actually, if we want to enforce MAX_ATTEMPTS, we should query attempts.
-            # To keep it simple, we will do it in a transaction.
-
-            # We will handle MAX_ATTEMPTS logic inside the worker wrapper
             from sqlalchemy import select
 
             from app.models.dispatch import DispatchIntentRow
@@ -107,7 +98,10 @@ async def process_intent(
                     increment_attempts=True,
                 )
                 logger.error(
-                    f"Terminal failure for {tenant_id}/{message_id} after {intent.attempts} attempts."
+                    "Terminal failure for %s/%s after %s attempts.",
+                    tenant_id,
+                    message_id,
+                    intent.attempts,
                 )
             else:
                 await repo.update_intent_state(

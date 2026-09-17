@@ -1,5 +1,5 @@
-import enum
 from datetime import datetime
+from enum import StrEnum
 from uuid import UUID
 
 from sqlalchemy import DateTime, Enum, ForeignKeyConstraint, Integer, text
@@ -8,7 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import Base
 
 
-class DispatchState(str, enum.Enum):
+class DispatchState(StrEnum):
     PENDING = "pending"
     ENQUEUED = "enqueued"
     PROCESSING = "processing"

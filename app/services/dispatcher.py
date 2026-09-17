@@ -1,14 +1,24 @@
-from arq.connections import ArqRedis
+from typing import Protocol
+from uuid import UUID
+
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.repositories.dispatch import DispatchRepository
+
+
+class JobQueue(Protocol):
+    async def enqueue_job(
+        self, function: str, tenant_id: UUID, message_id: UUID, *, _job_id: str
+    ) -> object:
+        """Enqueue an intent; the dispatcher does not inspect the queue result."""
+        ...
 
 
 class DispatcherService:
     def __init__(
         self,
         sessions: async_sessionmaker[AsyncSession],
-        redis: ArqRedis,
+        redis: JobQueue,
         batch_size: int = 50,
     ) -> None:
         self._sessions = sessions

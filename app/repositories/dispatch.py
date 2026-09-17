@@ -25,7 +25,7 @@ class DispatchRepository:
         self, batch_size: int = 50
     ) -> Sequence[DispatchIntentRow]:
         """Claim intents for processing by calling the security definer function."""
-        # Using a raw SQL statement to call the security definer function which bypasses RLS
+        # The restricted function claims work across tenant boundaries.
         statement = text(
             "SELECT tenant_id, message_id FROM sahulat.claim_pending_intents(:batch)"
         )

@@ -1,8 +1,8 @@
 # STATE.md — Current Truth
 
-**Last updated:** 2026-09-16 by Antigravity
+**Last updated:** 2026-09-17 by Codex
 **Current milestone:** M0 — Walking skeleton
-**Build status:** Green locally for SAH-003 on Python 3.12.14; CI configured but not run remotely. (Note: pytest encounters a Windows PermissionError when trying to write to `.pytest_cache`, but the tests themselves pass).
+**Build status:** SAH-006 commit a7da665 failed GitHub Quality run #14 (owner screenshots). Local Ruff and strict-mypy failures are repaired; remote logs and a remote rerun are unverified. See the latest session log for validation.
 
 ## Where the project actually is
 
@@ -12,22 +12,28 @@ The FastAPI application factory runs through Uvicorn and exposes public GET
 configuration at factory invocation, not import time. Documentation routes are
 disabled. A bounded per-process rate limit and no-body request policy cover this
 bootstrap. 
-Tenant provisioning and isolated persistence exist using PostgreSQL. The database enforces Row-Level Security (RLS) to isolate tenants. Repositories manage sessions and messages with idempotency constraints. A partitioned, append-only audit event table exists to store critical events securely. Standard operational logging redacts phone numbers and payloads. No queue, WhatsApp or model implementation exists.
+Tenant provisioning and isolated persistence exist using PostgreSQL. The database enforces Row-Level Security (RLS) to isolate tenants. Repositories manage sessions and messages with idempotency constraints. A partitioned, append-only audit event table exists to store critical events securely. Standard operational logging redacts phone numbers and payloads. SAH-005 authenticated WhatsApp ingress is committed. SAH-006 adds dispatch state, a restricted claim function, arq enqueueing and worker transitions, but is not complete. No model or outbound echo implementation exists.
 
-The uv manifest contains approved SAH-002 and SAH-003 packages; uv.lock is committed.
+The uv manifest includes PostgreSQL, migration, arq/Redis and Testcontainers dependencies; uv.lock is committed. This repair adds no dependencies.
 CI defines compilation, Ruff lint/format, strict mypy, import-linter and pytest.
-Two import contracts cover currently implemented boundaries. A negative test
+Five import contracts cover currently implemented boundaries. A negative test
 modifies a temporary copy and proves a forbidden import is rejected.
 
 ## In progress
 
-No implementation task is partially complete. Current branch:
-`main`.
+Current repair branch: `task/SAH-006-ci-repair`, based on a7da665.
+The earlier state document lagged behind the committed SAH-005/006 code.
+SAH-006 remains incomplete: the processor is a no-op that the worker can mark
+completed; workers lack a conditional claim/stale-processing recovery; dispatch
+transitions lack audit events. Dispatch tests use a queue fake, not real Redis.
+These require follow-up within SAH-006, not a claim that passing CI completes M0.
 
 ## Next up, in order
 
-1. SAH-007: outbound text echo.
-2. SAH-008: deployment and real-number demonstration.
+1. Complete/review SAH-006 against its task and ADR 0001, including recovery,
+   concurrency, transition audit and real-Redis verification.
+2. SAH-007: outbound text echo.
+3. SAH-008: deployment and real-number demonstration.
 
 Read the relevant docs/tasks file before implementation. Continue on a separate
 `task/<id>-<slug>` branch based on the completed prerequisite work.
@@ -47,21 +53,24 @@ Read the relevant docs/tasks file before implementation. Continue on a separate
   `.tools/python` path and UV_CACHE_DIR to `.uv-cache`, then invoke `.tools/uv/uv.exe`.
   No shell profile was modified. uv reported a denied optional Windows registry
   registration; the managed interpreter and virtual environment work without it.
-- Docker CLI exists; engine availability has not been checked. SAH-003 must verify
-  real PostgreSQL/Testcontainers tests; never substitute SQLite. (Verified in SAH-003).
+- Docker/Testcontainers PostgreSQL works outside the sandbox. The sandbox cannot
+  access the Docker named pipe; tests require approved Docker access here.
 - Health means process liveness only. The fixed-window limiter is aggregate per
   process, not distributed/per-tenant. SAH-005 needs route-specific limits and
   webhook body handling. Deployment also needs connection/header/slow-client limits.
-- No credentials are needed or defined yet. `.env` is ignored but not automatically
-  loaded. Inject environment variables; do not commit secrets.
+- Database, Redis and WhatsApp settings now require runtime configuration.
+  `.env` is ignored but not automatically loaded. Inject environment variables;
+  do not commit secrets.
 - The architecture negative test resolves lint-imports beside sys.executable;
   PATH discovery was unreliable in this Windows tool environment.
 - The human reference is docs/source/sahulat-solution-design.html, not the filename
-  mentioned in AGENTS.md. It remains pre-existing, untracked and unread.
+  mentioned in AGENTS.md. It is now tracked by prior work and remains unread here.
 - Git metadata writes require sandbox approval here.
 - Provider API contracts and delivery guarantees still require primary-document
   verification during SAH-005/007. No provider exactly-once guarantee is assumed.
-- pytest struggles with Windows file permissions (`.pytest_cache` and `tmp_path`) in this environment.
+- pytest can hit Windows temp/cache ownership errors. Disable its optional cache
+  with `-p no:cacheprovider` and use a fresh, previously nonexistent workspace
+  `--basetemp` directory. Do not skip failing tests to conceal permissions errors.
 
 ## Decisions made recently
 
@@ -75,11 +84,27 @@ Read the relevant docs/tasks file before implementation. Continue on a separate
 
 ## Deliberately not done
 
-No database/Redis integration beyond tenant/conversation schema, WhatsApp adapter, future module stubs, deployment,
-remote CI execution, or reads/changes to the original reference HTML. The service
-is a local bootstrap; M0 is not yet complete.
+This CI repair does not complete dispatch recovery, implement outbound echo,
+deploy, publish a branch, or change the original reference HTML. The owner
+declined network escalation to read Actions logs; the remote failed step is
+unknown. M0 is not yet complete.
 
 ## Session log
+
+### 2026-09-17 — Codex — SAH-006 CI repair
+- Did: repaired seven Ruff errors and sixteen strict-mypy errors reproduced on
+  a7da665. Added a consumer-owned queue protocol, typed test doubles, adopted
+  StrEnum and wrapped long comments/logging/SQL without changing dispatch policy.
+  Corrected stale STATE claims using committed code as truth.
+- Validation: 60 tests pass with Docker access and a fresh workspace basetemp;
+  Ruff lint/format, strict mypy (59 source files), compilation, all five import
+  contracts and git diff whitespace checks pass. An earlier run had 59 passes
+  and one Windows temp-directory permission error, resolved by the fresh path.
+- Decided: apply ADR 0001's existing required-I/O-protocol exception; no new
+  architectural decision or dependency. Limit this task to quality-check repair.
+- Assumed: local failures explain likely CI blockers, not proof of the unseen
+  remote step. Screenshots expose only exit code 1; remote rerun remains unverified.
+- Next: review/complete the SAH-006 gaps above before SAH-007. No push or deployment.
 
 ### 2026-09-16 — Antigravity — SAH-004
 - Did: Created `AuditRow` with partitioned boundaries and restricted INSERT-only grants. Implemented `AuditRepository` for transactional event logging. Wrote `RedactingFormatter` to protect operational logs.

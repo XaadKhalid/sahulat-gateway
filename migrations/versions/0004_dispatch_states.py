@@ -64,7 +64,8 @@ def upgrade() -> None:
             WHERE (tenant_id, message_id) IN (
                 SELECT d.tenant_id, d.message_id
                 FROM sahulat.dispatch_intents d
-                WHERE d.state = 'pending' OR (d.state = 'failed_retry' AND d.next_attempt_at <= now())
+                WHERE d.state = 'pending'
+                    OR (d.state = 'failed_retry' AND d.next_attempt_at <= now())
                 FOR UPDATE SKIP LOCKED
                 LIMIT batch_size
             )
@@ -75,7 +76,8 @@ def upgrade() -> None:
         "REVOKE ALL ON FUNCTION sahulat.claim_pending_intents(integer) FROM PUBLIC"
     )
     op.execute(
-        "GRANT EXECUTE ON FUNCTION sahulat.claim_pending_intents(integer) TO sahulat_runtime"
+        "GRANT EXECUTE ON FUNCTION sahulat.claim_pending_intents(integer) "
+        "TO sahulat_runtime"
     )
 
 
