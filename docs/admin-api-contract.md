@@ -15,8 +15,18 @@ session (see Auth below). All responses are JSON. Errors follow FastAPI's
 `ProblemDetails`-style shape:
 
 ```json
-{ "detail": "human-readable message", "type": "error_code_string" }
+{ "detail": "human-readable message", "type": "error_code_string", "violations": ["string"] }
 ```
+
+- `422` request-validation failures (e.g. invalid manifest YAML) return
+  FastAPI's standard validation format — the only shape where `detail` is an
+  array rather than a string:
+  ```json
+  { "detail": [{ "loc": ["body"], "msg": "error message", "type": "value_error" }] }
+  ```
+- The `violations` array is optional and only present on errors (such as the
+  409 publish precondition failure) that carry a list of specific reasons the
+  client needs to surface in the UI.```
 
 ---
 
@@ -78,10 +88,12 @@ Tenant onboarding and configuration.
   poll `GET .../documents/{document_id}` for `status: "ready"|"failed"`.
 - `GET /api/v1/admin/tenants/{id}/documents` → list with status per doc.
 - `DELETE /api/v1/admin/tenants/{id}/documents/{document_id}`
-- `PUT /api/v1/admin/tenants/{id}/manifest` — raw OpenAPI 3.1 + `x-agent`
-  YAML/JSON body → validates and stores. 422 with field-level errors on an
-  invalid manifest; validation logic must exactly match what `actions/manifest.py`
-  enforces at runtime, so the UI never accepts something the orchestrator
+- `PUT /api/v1/admin/tenants/{id}/manifest` — accepts `Content-Type:
+  application/yaml`; the body is the raw OpenAPI 3.1 YAML document as a text
+  string (including `x-agent` annotations). Validates and stores. 422 with
+  field-level errors on an invalid manifest; server-side validation must use
+  the same code path `actions/manifest.py` uses at runtime — not a separate
+  UI-facing validator — so the UI never accepts something the orchestrator
   would reject.
 - `POST /api/v1/admin/tenants/{id}/publish` — `status: draft → live`, only
   once WhatsApp is connected, at least one document is ready, and the
@@ -112,7 +124,7 @@ touching the real WhatsApp channel.
   experience the end customer gets, so showing the orchestrator's reasoning
   is a feature.
 - `POST /api/v1/admin/tenants/{id}/sandbox/reset` — clears sandbox session
-  state (starts a fresh identity tier at `anonymous`).
+  state (starts a fresh identity tier at `anonymous`). Returns `204 No Content`.
 
 This may become a WebSocket (`/api/v1/admin/tenants/{id}/sandbox/stream`)
 if request/response polling feels wrong once real turn-loop latency is
@@ -126,4 +138,8 @@ measurable, not preemptively.
 Record every change here with a date and a one-line reason, so both sides can
 tell at a glance whether their assumptions are stale.
 
+- `2026-09-17` — refined error shapes: added optional `violations` array to
+  409 precondition errors, documented `422` validation format, specified manifest
+  PUT content type and shared validation requirement, specified sandbox reset
+  response.
 - `2026-09-17` — initial draft, nothing implemented yet.
