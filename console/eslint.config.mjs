@@ -5,16 +5,17 @@ import nextTs from 'eslint-config-next/typescript';
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
-  // Override default ignores of eslint-config-next.
-  globalIgnores([
-    // Default ignores of eslint-config-next:
-    '.next/**',
-    'out/**',
-    'build/**',
-    'next-env.d.ts',
-    // Generated from OpenAPI spec — do not lint.
-    'lib/api-client/generated/**',
-  ]),
+  {
+    ignores: [
+      '.next/**',
+      'out/**',
+      'build/**',
+      'next-env.d.ts',
+      'src/lib/api-client/generated/**',
+      'lib/api-client/generated/**',
+      'node_modules/**',
+    ],
+  },
 ]);
 
 export default eslintConfig;

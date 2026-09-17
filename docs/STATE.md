@@ -23,7 +23,7 @@ modifies a temporary copy and proves a forbidden import is rejected.
 
 ## In progress
 
-Current branch: 	ask/SAH-006-complete-recovery.
+Current branch: main.
 The dispatcher reclaims expired processing rows, and all worker result writes require the matching unexpired token. Redis deliveries use fresh queue IDs; the processor receives a stable tenant/message idempotency key.
 The unconfigured processor now fails terminally instead of falsely completing. Real PostgreSQL/Redis tests cover interrupted processing, redispatch, loss of queued data, and audit-write failure.
 SAH-006 is complete on this branch: dispatch transitions generate atomic audit events, lost enqueued jobs are reclaimed via 60-second leases, and exhausted retries enter a REVIEW_REQUIRED state instead of silently dropping. 
@@ -36,7 +36,7 @@ The outbound implementation is SAH-007; its merge gates explicitly require idemp
 2. SAH-008: deployment and real-number demonstration.
 
 Read the relevant docs/tasks file before implementation. Continue on a separate
-	ask/<id>-<slug> branch based on the completed prerequisite work.
+task/<id>-<slug> branch based on the completed prerequisite work.
 
 ## Open questions blocking later work
 
@@ -95,6 +95,12 @@ Read the relevant docs/tasks file before implementation. Continue on a separate
 No database/Redis integration beyond tenant/conversation schema, WhatsApp adapter, future module stubs, deployment, or reads/changes to the original reference HTML. The remote CI is now fully verified and green. M0 is not yet complete.
 
 ## Session log
+### 2026-09-17 — Console UI Task 3 (Tenants screens, layout, fixes)
+
+- Did: Relocated `console/lib/` to `console/src/lib/` to match Next.js `src/` directory layout and updated `generate:types` script. Implemented tenant listing (`/tenants`) and tenant detail / onboarding (`/tenants/[id]`) with WhatsApp connect, multipart document upload, raw manifest editor, and pre-condition publication flow with error handling. Implemented mock auth provider, login page, app layout, and StatusBadge UI component.
+- Fixed: Resolved openapi-fetch path parameter typing and contract error response handling (`detail` instead of `message`, status checking via `res.response`). Configured ESLint 9 flat config ignores for generated OpenAPI types and updated package.json lint script (`eslint src`). Refactored data-fetching effects to comply with React 19 compiler immutability and `set-state-in-effect` lint rules.
+- Validation: `tsc -p console/tsconfig.json --noEmit` clean (0 errors), `npm --prefix console run format:check` clean, ESLint on `console/src` clean (0 errors, 0 warnings), and `next build` production compilation succeeded with all routes statically and dynamically generated. Backend checks (`ruff check .`, `mypy --strict app/ tests/`) also pass clean.
+- Next: Screen 1 (User management) and Screen 3 (Sandbox chat window).
 ### 2026-09-17 — Typed API client + MSW mock layer (Task 2)
 
 - Did: Authored console/lib/api-client/admin-api.openapi.yaml from the finalized contract (21 endpoints, 26 schemas, all error shapes). Generated typed client via openapi-typescript. Created typed openapi-fetch client with credentials: 'include'. Set up full MSW mock layer: data.ts (in-memory store), 7 handler files (auth, users, tenants, documents, manifest, publish, sandbox), browser/server setup. Added .env.example, format scripts, type-fest @5.9.0 npm override (5.10.0 unpublished from npm).
@@ -126,7 +132,7 @@ No database/Redis integration beyond tenant/conversation schema, WhatsApp adapte
 
 ### 2026-09-17 Ã¢â‚¬â€ Antigravity Ã¢â‚¬â€ SAH-006 Complete Recovery
 - Did: Implemented atomic transition audits for all dispatcher/worker states. Added 60-second enqueue leases to reclaim lost queued data if Redis restarts or drops jobs. Handled exhaustion of retries and unknown outcomes by placing them into a REVIEW_REQUIRED state. Added close_dispatch_review.sql for operators to safely close stalled reviews without auto-resend. Added integration tests covering Redis outages, loss of queue data, and audit-write failure rollback.
-- Validation: All tests passed on local Testcontainers (Postgres & Redis). 	est_dispatch_recovery.py specifically verifies that failed audits roll back state transitions and queue/Redis outages re-enqueue the items once the lease expires.
+- Validation: All tests passed on local Testcontainers (Postgres & Redis). test_dispatch_recovery.py specifically verifies that failed audits roll back state transitions and queue/Redis outages re-enqueue the items once the lease expires.
 - Decided: Any unknown failure (Exception) in the worker translates to REVIEW_REQUIRED rather than an immediate terminal failure, protecting against operator uncertainty. Enqueue leases are used to guarantee at-least-once processing in the event of queue-layer amnesia. Resolved the incomplete SAH-006 items left by the previous session.
 - Assumed: N/A.
 - Next: SAH-007.

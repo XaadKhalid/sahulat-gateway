@@ -6,10 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint src",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "generate:types": "openapi-typescript lib/api-client/admin-api.openapi.yaml --output lib/api-client/generated/types.ts"
+    "generate:types": "openapi-typescript src/lib/api-client/admin-api.openapi.yaml --output src/lib/api-client/generated/types.ts"
   },
   "exports": {},
   "overrides": {
