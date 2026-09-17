@@ -26,9 +26,8 @@ No implementation task is partially complete. Current branch:
 
 ## Next up, in order
 
-1. SAH-006: durable dispatch and worker recovery.
-2. SAH-007: outbound text echo.
-3. SAH-008: deployment and real-number demonstration.
+1. SAH-007: outbound text echo.
+2. SAH-008: deployment and real-number demonstration.
 
 Read the relevant docs/tasks file before implementation. Continue on a separate
 `task/<id>-<slug>` branch based on the completed prerequisite work.
@@ -110,3 +109,5 @@ is a local bootstrap; M0 is not yet complete.
 - Established the documentation-only baseline, eight task files and two ADR proposals.
 - Owner subsequently approved both proposals; deployment requirements remain recorded
   as later prerequisites rather than guessed account choices.
+
+

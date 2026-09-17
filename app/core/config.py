@@ -24,3 +24,18 @@ class DatabaseSettings(BaseSettings):
         if not value.get_secret_value().startswith("postgresql+asyncpg://"):
             raise ValueError("Database URL must use postgresql+asyncpg")
         return value
+
+
+class RedisSettings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_prefix="SAHULAT_", frozen=True, hide_input_in_errors=True
+    )
+
+    redis_url: SecretStr
+
+    @field_validator("redis_url")
+    @classmethod
+    def require_redis(cls, value: SecretStr) -> SecretStr:
+        if not value.get_secret_value().startswith("redis://"):
+            raise ValueError("Redis URL must use redis://")
+        return value

@@ -1,0 +1,153 @@
+import logging
+from datetime import UTC, datetime, timedelta
+from typing import Any
+from uuid import UUID
+
+from arq.connections import RedisSettings
+from arq.cron import cron
+from sqlalchemy.ext.asyncio import async_sessionmaker
+
+from app.core.config import DatabaseSettings
+from app.core.config import RedisSettings as AppRedisSettings
+from app.core.redis import get_redis_pool
+from app.infrastructure.database import create_database_engine, tenant_transaction
+from app.models.dispatch import DispatchState
+from app.repositories.dispatch import DispatchRepository
+from app.services.dispatcher import DispatcherService
+from app.services.processor import IntentProcessorService, RetryableError, TerminalError
+
+logger = logging.getLogger(__name__)
+
+MAX_ATTEMPTS = 5
+
+
+async def startup(ctx: dict[str, Any]) -> None:
+    db_settings = DatabaseSettings()
+    redis_settings = AppRedisSettings()
+
+    engine = create_database_engine(db_settings)
+    sessions = async_sessionmaker(engine, expire_on_commit=False)
+    redis_pool = await get_redis_pool(redis_settings)
+
+    ctx["engine"] = engine
+    ctx["sessions"] = sessions
+    ctx["redis"] = redis_pool
+
+
+async def shutdown(ctx: dict[str, Any]) -> None:
+    engine = ctx["engine"]
+    await engine.dispose()
+
+
+async def dispatch_pending_cron(ctx: dict[str, Any]) -> None:
+    """Cron job to poll for pending intents and enqueue them."""
+    sessions = ctx["sessions"]
+    redis = ctx["redis"]
+
+    dispatcher = DispatcherService(sessions, redis)
+    dispatched = await dispatcher.dispatch_pending()
+    if dispatched > 0:
+        logger.info(f"Dispatched {dispatched} pending intents to Arq.")
+
+
+async def process_intent(
+    ctx: dict[str, Any], tenant_id: UUID, message_id: UUID
+) -> None:
+    sessions = ctx["sessions"]
+    processor = IntentProcessorService(sessions)
+
+    # Mark as processing
+    async with tenant_transaction(sessions, tenant_id) as session:
+        repo = DispatchRepository(session)
+        await repo.update_intent_state(tenant_id, message_id, DispatchState.PROCESSING)
+
+    try:
+        await processor.process(tenant_id, message_id)
+
+        # Success
+        async with tenant_transaction(sessions, tenant_id) as session:
+            repo = DispatchRepository(session)
+            await repo.update_intent_state(
+                tenant_id, message_id, DispatchState.COMPLETED
+            )
+
+    except RetryableError as e:
+        logger.warning(f"Retryable failure for {tenant_id}/{message_id}: {e}")
+        async with tenant_transaction(sessions, tenant_id) as session:
+            repo = DispatchRepository(session)
+            # For this simple retry strategy, delay 1 minute * attempt count
+            # The attempts count will be incremented inside update_intent_state
+            # Wait, we need to know the attempts count to set the delay, or just fixed delay
+            next_try = datetime.now(UTC) + timedelta(minutes=1)
+
+            # Check if we should move to terminal instead
+            # We could fetch the row first, but let's just let the repository handle increment
+            # Actually, if we want to enforce MAX_ATTEMPTS, we should query attempts.
+            # To keep it simple, we will do it in a transaction.
+
+            # We will handle MAX_ATTEMPTS logic inside the worker wrapper
+            from sqlalchemy import select
+
+            from app.models.dispatch import DispatchIntentRow
+
+            intent = (
+                await session.scalars(
+                    select(DispatchIntentRow).where(
+                        DispatchIntentRow.tenant_id == tenant_id,
+                        DispatchIntentRow.message_id == message_id,
+                    )
+                )
+            ).one()
+
+            if intent.attempts >= MAX_ATTEMPTS:
+                await repo.update_intent_state(
+                    tenant_id,
+                    message_id,
+                    DispatchState.FAILED_TERMINAL,
+                    increment_attempts=True,
+                )
+                logger.error(
+                    f"Terminal failure for {tenant_id}/{message_id} after {intent.attempts} attempts."
+                )
+            else:
+                await repo.update_intent_state(
+                    tenant_id,
+                    message_id,
+                    DispatchState.FAILED_RETRY,
+                    increment_attempts=True,
+                    next_attempt_at=next_try,
+                )
+
+    except TerminalError as e:
+        logger.error(f"Terminal failure for {tenant_id}/{message_id}: {e}")
+        async with tenant_transaction(sessions, tenant_id) as session:
+            repo = DispatchRepository(session)
+            await repo.update_intent_state(
+                tenant_id,
+                message_id,
+                DispatchState.FAILED_TERMINAL,
+                increment_attempts=True,
+            )
+
+    except Exception as e:
+        logger.exception(f"Unexpected failure for {tenant_id}/{message_id}: {e}")
+        async with tenant_transaction(sessions, tenant_id) as session:
+            repo = DispatchRepository(session)
+            await repo.update_intent_state(
+                tenant_id,
+                message_id,
+                DispatchState.FAILED_TERMINAL,
+                increment_attempts=True,
+            )
+        raise
+
+
+class WorkerSettings:
+    functions = [process_intent]
+    cron_jobs = [cron(dispatch_pending_cron, second=set(range(0, 60, 5)))]
+    on_startup = startup
+    on_shutdown = shutdown
+    # For Arq to know where Redis is:
+    redis_settings = RedisSettings.from_dsn(
+        AppRedisSettings().redis_url.get_secret_value()
+    )
