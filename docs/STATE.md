@@ -23,7 +23,11 @@ modifies a temporary copy and proves a forbidden import is rejected.
 
 ## In progress
 
-Current branch: main.
+Current branch observed on 2026-09-18: `task/SAH-002-admin-console`.
+There is substantial uncommitted admin API and console work from another session.
+The earlier green checks do not validate those current edits. In particular,
+`app.main` now creates an application at import time, unlike the factory-only
+description above. See the latest runtime diagnosis below.
 The dispatcher reclaims expired processing rows, and all worker result writes require the matching unexpired token. Redis deliveries use fresh queue IDs; the processor receives a stable tenant/message idempotency key.
 The unconfigured processor now fails terminally instead of falsely completing. Real PostgreSQL/Redis tests cover interrupted processing, redispatch, loss of queued data, and audit-write failure.
 SAH-006 is complete on this branch: dispatch transitions generate atomic audit events, lost enqueued jobs are reclaimed via 60-second leases, and exhausted retries enter a REVIEW_REQUIRED state instead of silently dropping. 
@@ -95,6 +99,36 @@ task/<id>-<slug> branch based on the completed prerequisite work.
 No database/Redis integration beyond tenant/conversation schema, WhatsApp adapter, future module stubs, deployment, or reads/changes to the original reference HTML. The remote CI is now fully verified and green. M0 is not yet complete.
 
 ## Session log
+### 2026-09-18 — Codex — Current-branch runtime diagnosis
+
+- Scope: owner's request to run the current admin-console branch and identify
+  its issue. Preserved all pre-existing uncommitted application work.
+- Reproduced: the existing backend on port 8000 returns 200 for liveness but
+  500 for a validly shaped login request. The untracked batch launcher contains
+  a percent-encoded database password; cmd expands its percent-digit sequence
+  as a positional argument. Reproducing that expansion raises PostgreSQL
+  InvalidPasswordError (28P01). Preserving the URL produces the expected 401
+  for a deliberately nonexistent diagnostic account.
+- Also found: `.env.example` is not loaded, so the console defaults to MSW mocks.
+  Backend CORS permits localhost:8080 but rejects 127.0.0.1:8080 and localhost:3000.
+  AuthProvider/login do not handle rejected network promises, so connectivity
+  failures can leave loading/submitting indicators stuck. Live API errors wrap
+  the documented error object inside an extra `detail` property.
+- Runtime workaround: started a loopback backend on port 8001 with the local
+  URL preserved in memory, and console on port 8080 with process-local
+  NEXT_PUBLIC_API_BASE_URL=http://localhost:8001/api/v1/admin. Use
+  http://localhost:8080/login. Left the original port-8000 process untouched.
+- Verified: console login page 200, backend health 200, CORS preflight 200,
+  database-backed invalid-login 401. Did not claim a successful authenticated
+  user flow. Browser automation tools failed, so verification used HTTP probes
+  and source inspection. No application fixes, migration, dependency changes,
+  push or deployment. No Redis listener was observed; background processing was
+  not started while the outbound processor remains unimplemented.
+- Next: replace the credential-bearing batch launcher with environment/secret
+  injection, make real/mock mode explicit, align development origins, handle
+  auth network errors and restore the agreed error envelope. SAH-007 remains
+  pending; this diagnosis does not implement outbound echo.
+
 ### 2026-09-17 — Console UI Task 3 (Tenants screens, layout, fixes)
 
 - Did: Relocated `console/lib/` to `console/src/lib/` to match Next.js `src/` directory layout and updated `generate:types` script. Implemented tenant listing (`/tenants`) and tenant detail / onboarding (`/tenants/[id]`) with WhatsApp connect, multipart document upload, raw manifest editor, and pre-condition publication flow with error handling. Implemented mock auth provider, login page, app layout, and StatusBadge UI component.
