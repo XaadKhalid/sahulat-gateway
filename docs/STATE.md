@@ -99,6 +99,25 @@ task/<id>-<slug> branch based on the completed prerequisite work.
 No database/Redis integration beyond tenant/conversation schema, WhatsApp adapter, future module stubs, deployment, or reads/changes to the original reference HTML. The remote CI is now fully verified and green. M0 is not yet complete.
 
 ## Session log
+### 2026-09-18 — Codex — Admin-console source checkpoint
+
+- Owner requested committing work so far. Saved the existing admin API, models,
+  migrations, tests, dependency locks and console UI as work-in-progress commits;
+  this is not a merge-ready or deployment-ready declaration. See ADR 0008.
+- Applied Ruff formatting to the pending Python files. Ruff lint, strict mypy
+  (80 files), compilation and all five architecture contracts pass.
+- Full pytest attempt: 32 passed, 1 failed, 74 setup errors. Integration setup
+  cannot find the Docker engine pipe. The independently reproduced unit failure
+  is test_import_does_not_load_runtime_configuration: app.main's module-level
+  create_app() reads settings during import. Preserved behavior for this snapshot.
+- Console TypeScript (`tsc --noEmit`) passes. The combined console lint/format
+  run did not complete within the checkpoint's verification window; those
+  checks are not claimed green for this current UI diff.
+- Excluded local credential-bearing start-backend.bat, test_api.py, test_auth.py
+  and server logs via .gitignore; kept these files locally. No push or merge.
+- Next: resolve the documented runtime, contract and validation failures before
+  merge; continue SAH-007 only after the current branch handoff is settled.
+
 ### 2026-09-18 — Codex — Current-branch runtime diagnosis
 
 - Scope: owner's request to run the current admin-console branch and identify

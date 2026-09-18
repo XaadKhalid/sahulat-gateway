@@ -19,7 +19,9 @@ from testcontainers.community.postgres import PostgresContainer
 
 from app.core.config import DatabaseSettings
 from app.infrastructure.database import create_database_engine
+from app.models.admin import AdminUserRow
 from app.models.tenants import TenantRow
+from app.services.auth_service import hash_password
 
 
 @dataclass(frozen=True)
@@ -29,6 +31,23 @@ class Database:
     sessions: async_sessionmaker[AsyncSession]
     tenant_a: UUID
     tenant_b: UUID
+    admin_id: UUID
+    operator_id: UUID
+
+
+@dataclass(frozen=True)
+class AdminUserCredentials:
+    email: str
+    password: str
+    role: str
+
+
+ADMIN_CREDENTIALS = AdminUserCredentials(
+    email="admin@acme.com", password="password", role="admin"
+)
+OPERATOR_CREDENTIALS = AdminUserCredentials(
+    email="ops@acme.com", password="password123", role="operator"
+)
 
 
 @pytest.fixture(scope="session")
@@ -62,12 +81,12 @@ async def initialize_database(
 ) -> None:
     async with owner.begin() as connection:
         await connection.execute(text(bootstrap_sql))
-        # Role DDL has no bind slots; SQLAlchemy quotes the generated secret.
         create_login = text(
             "CREATE ROLE sahulat_test_login LOGIN PASSWORD :password"
         ).bindparams(password=password)
         compiled = create_login.compile(
-            dialect=connection.dialect, compile_kwargs={"literal_binds": True}
+            dialect=connection.dialect,
+            compile_kwargs={"literal_binds": True},
         )
         await connection.execute(text(str(compiled)))
         await connection.execute(text("GRANT sahulat_runtime TO sahulat_test_login"))
@@ -79,18 +98,70 @@ async def seed_tenants(data: Database) -> None:
         await connection.execute(
             insert(TenantRow),
             [
-                {"id": data.tenant_a, "name": "Retailer A"},
-                {"id": data.tenant_b, "name": "Retailer B"},
+                {
+                    "id": data.tenant_a,
+                    "name": "Retailer A",
+                    "policy": {
+                        "persona": "You are a helpful business assistant.",
+                        "languages": "en",
+                        "domain_fence": "same-origin",
+                        "refusal_style": "polite",
+                        "business_hours": "09:00-18:00",
+                        "verified_ttl_minutes": 60,
+                        "handoff_rules": "escalate",
+                    },
+                },
+                {
+                    "id": data.tenant_b,
+                    "name": "Retailer B",
+                    "policy": {
+                        "persona": "You are a helpful business assistant.",
+                        "languages": "en",
+                        "domain_fence": "same-origin",
+                        "refusal_style": "polite",
+                        "business_hours": "09:00-18:00",
+                        "verified_ttl_minutes": 60,
+                        "handoff_rules": "escalate",
+                    },
+                },
             ],
         )
         await connection.execute(
             text(
-                "INSERT INTO sahulat_private.tenant_routes (route_key, tenant_id) "
+                "INSERT INTO sahulat_private.tenant_routes "
+                "(route_key, tenant_id) "
                 "VALUES (:route, :tenant)"
             ),
             [
                 {"route": "route-a", "tenant": data.tenant_a},
                 {"route": "route-b", "tenant": data.tenant_b},
+            ],
+        )
+
+
+async def seed_admin_users(data: Database) -> None:
+    from datetime import UTC, datetime
+
+    async with data.owner.begin() as connection:
+        await connection.execute(
+            insert(AdminUserRow),
+            [
+                {
+                    "id": data.admin_id,
+                    "email": ADMIN_CREDENTIALS.email,
+                    "password_hash": hash_password(ADMIN_CREDENTIALS.password),
+                    "role": ADMIN_CREDENTIALS.role,
+                    "display_name": "Acme Admin",
+                    "created_at": datetime(2026, 9, 17, 9, 0, 0, tzinfo=UTC),
+                },
+                {
+                    "id": data.operator_id,
+                    "email": OPERATOR_CREDENTIALS.email,
+                    "password_hash": hash_password(OPERATOR_CREDENTIALS.password),
+                    "role": OPERATOR_CREDENTIALS.role,
+                    "display_name": "Ops User",
+                    "created_at": datetime(2026, 9, 17, 9, 30, 0, tzinfo=UTC),
+                },
             ],
         )
 
@@ -122,9 +193,12 @@ async def database(
             async_sessionmaker(runtime, expire_on_commit=False),
             uuid4(),
             uuid4(),
+            uuid4(),
+            uuid4(),
         )
         try:
             await seed_tenants(data)
+            await seed_admin_users(data)
             yield data
         finally:
             await runtime.dispose()

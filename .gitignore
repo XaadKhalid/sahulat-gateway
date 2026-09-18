@@ -10,3 +10,10 @@ __pycache__/
 .env
 .env.*
 !.env.example
+
+# Local runtime logs and credential-bearing diagnostic/launch scripts.
+/server.log
+/server_error.log
+/start-backend.bat
+/test_api.py
+/test_auth.py

@@ -13,6 +13,9 @@ dependencies = [
     "alembic>=1.20.0",
     "arq>=0.28.0",
     "redis>=5.3.1",
+    "passlib>=1.7.4",
+    "argon2-cffi>=21.3.0",
+    "email-validator>=2.2.0",
 ]
 
 [dependency-groups]
@@ -34,7 +37,10 @@ testpaths = ["tests"]
 pythonpath = ["."]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    "ignore:Accessing argon2:DeprecationWarning",
+]
 
 [tool.ruff]
 target-version = "py312"
@@ -42,6 +48,9 @@ line-length = 88
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "ASYNC"]
+
+[tool.ruff.lint.per-file-ignores]
+"app/api/**" = ["B008"]
 
 [tool.mypy]
 python_version = "3.12"
