@@ -1,18 +1,22 @@
-interface StatusBadgeProps {
-  status: 'draft' | 'connecting' | 'live' | 'suspended';
-}
+import { Badge } from '@/components/ui/badge';
+import { cva, type VariantProps } from 'class-variance-authority';
 
-const STATUS_STYLES: Record<StatusBadgeProps['status'], string> = {
-  live: 'bg-green-900/30 text-green-400',
-  connecting: 'bg-yellow-900/30 text-yellow-400',
-  suspended: 'bg-red-900/30 text-red-400',
-  draft: 'bg-gray-800 text-gray-400',
-};
+const statusVariants = cva('', {
+  variants: {
+    status: {
+      live: 'border-transparent bg-green-soft text-green-deep',
+      connecting: 'border-transparent bg-amber-soft text-amber',
+      suspended: 'border-transparent bg-danger-soft text-danger',
+      draft: 'border-transparent bg-muted text-mute',
+    },
+  },
+  defaultVariants: { status: 'draft' },
+});
 
-export function StatusBadge({ status }: StatusBadgeProps) {
+export function StatusBadge({ status }: { status: 'draft' | 'connecting' | 'live' | 'suspended' }) {
   return (
-    <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${STATUS_STYLES[status]}`}>
+    <Badge variant="default" className={statusVariants({ status })}>
       {status}
-    </span>
+    </Badge>
   );
 }

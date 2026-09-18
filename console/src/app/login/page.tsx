@@ -26,21 +26,23 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex h-screen w-full items-center justify-center bg-gray-950">
+    <div className="flex h-screen w-full items-center justify-center bg-paper">
       <form
         onSubmit={handleSubmit}
-        className="w-80 space-y-6 rounded-lg border border-gray-800 bg-gray-900 p-8"
+        className="w-80 space-y-6 rounded-xl border border-line bg-card p-8"
       >
-        <h1 className="text-center text-xl font-bold text-gray-100">Sahulat Gateway</h1>
-        <p className="text-center text-sm text-gray-500">Sign in to continue</p>
+        <div className="text-center">
+          <h1 className="font-display text-xl text-ink">Sahulat Gateway</h1>
+          <p className="mt-1 text-sm text-mute">Sign in to continue</p>
+        </div>
 
         <div className="space-y-2">
-          <label className="block text-sm text-gray-300">Email</label>
+          <label className="text-sm font-medium text-ink-2">Email</label>
           <input
             type="email"
             value={email}
             onChange={e => setEmail(e.target.value)}
-            className="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-gray-100 placeholder-gray-600 focus:border-blue-500 focus:outline-none"
+            className="w-full rounded-md border border-line bg-card px-3 py-2 text-sm text-ink placeholder:text-mute focus:outline-none focus:ring-2 focus:ring-ring"
             placeholder="admin@acme.com"
             autoComplete="email"
             required
@@ -48,24 +50,24 @@ export default function LoginPage() {
         </div>
 
         <div className="space-y-2">
-          <label className="block text-sm text-gray-300">Password</label>
+          <label className="text-sm font-medium text-ink-2">Password</label>
           <input
             type="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
-            className="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-gray-100 placeholder-gray-600 focus:border-blue-500 focus:outline-none"
+            className="w-full rounded-md border border-line bg-card px-3 py-2 text-sm text-ink placeholder:text-mute focus:outline-none focus:ring-2 focus:ring-ring"
             placeholder="password"
             autoComplete="current-password"
             required
           />
         </div>
 
-        {error && <p className="text-sm text-red-400">{error}</p>}
+        {error && <p className="text-sm text-danger">{error}</p>}
 
         <button
           type="submit"
           disabled={submitting}
-          className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          className="w-full rounded-md bg-green px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-green-deep disabled:opacity-50"
         >
           {submitting ? 'Signing in…' : 'Sign in'}
         </button>

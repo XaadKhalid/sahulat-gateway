@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import { client } from '@/lib/api-client/client';
+import { client, API_BASE_URL } from '@/lib/api-client/client';
 
 type MeResponse = { id: string; email: string; role: 'admin' | 'operator' };
 
@@ -19,6 +19,10 @@ export function useAuth(): AuthContextValue {
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
 }
+
+const isRelativeUrl = !API_BASE_URL.startsWith('http');
+
+let mswStarted = false;
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<MeResponse | null>(null);
@@ -54,7 +58,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ user, loading, login, logout }}>
+      {children}
+    </AuthContext.Provider>
   );
 }
 
@@ -62,19 +68,24 @@ export function RootProviders({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     async function boot() {
-      if (process.env.NODE_ENV === 'development') {
+      if (process.env.NODE_ENV === 'development' && isRelativeUrl && !mswStarted) {
+        mswStarted = true;
         const { worker } = await import('@/lib/mocks/browser');
         await worker.start();
       }
-      setReady(true);
+      if (!cancelled) setReady(true);
     }
-    boot();
+    void boot();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (!ready) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-gray-950 text-gray-400">
+      <div className="flex h-screen w-full items-center justify-center bg-paper text-mute">
         Initializing…
       </div>
     );

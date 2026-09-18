@@ -10,13 +10,13 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!loading) {
-      router.replace(user ? '/tenants' : '/login');
+      router.replace(user ? '/console' : '/login');
     }
   }, [user, loading, router]);
 
   if (loading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-gray-950 text-gray-400">
+      <div className="flex h-screen w-full items-center justify-center bg-paper text-mute">
         Loading…
       </div>
     );

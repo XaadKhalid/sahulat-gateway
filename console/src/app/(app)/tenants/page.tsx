@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import { client } from '@/lib/api-client/client';
 import type { components } from '@/lib/api-client/generated/types';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 type Tenant = components['schemas']['Tenant'];
 type TenantList = components['schemas']['TenantList'];
@@ -43,58 +45,70 @@ export default function TenantsPage() {
     setLoading(false);
   }
 
-  if (loading) return <div className="text-gray-400">Loading tenants…</div>;
-  if (err) return <div className="text-red-400">Error: {err}</div>;
+  if (loading) return <div className="text-mute">Loading tenants…</div>;
+  if (err) return <div className="text-danger">Error: {err}</div>;
 
   const tenants = data?.items ?? [];
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-100">Tenants</h1>
-        <button
-          onClick={createTenant}
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          Create Tenant
-        </button>
-      </div>
+    <div className="space-y-6">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-sm text-green">Control plane</p>
+          <h1 className="font-display text-4xl text-ink">Tenants</h1>
+        </div>
+        <Button onClick={createTenant}>Create tenant</Button>
+      </header>
 
       {tenants.length === 0 ? (
-        <p className="text-gray-500">No tenants yet.</p>
+        <p className="text-mute">No tenants yet.</p>
       ) : (
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr>
-              <th className="text-left py-2 text-gray-400">Name</th>
-              <th className="text-left py-2 text-gray-400">Status</th>
-              <th className="text-left py-2 text-gray-400">WhatsApp</th>
-              <th className="text-left py-2 text-gray-400">Created</th>
-              <th className="text-right py-2 text-gray-400">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tenants.map((t: Tenant) => (
-              <tr key={t.id} className="border-t border-gray-800">
-                <td className="py-2 text-gray-100">{t.name}</td>
-                <td className="py-2">
-                  <StatusBadge status={t.status} />
-                </td>
-                <td className="py-2 text-gray-400">
-                  {t.whatsapp_connected ? 'Connected' : 'Not connected'}
-                </td>
-                <td className="py-2 text-gray-400">
-                  {new Date(t.created_at).toLocaleDateString()}
-                </td>
-                <td className="py-2 text-right">
-                  <Link href={`/tenants/${t.id}`} className="text-blue-400 hover:text-blue-300">
-                    View →
-                  </Link>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr>
+                <th className="text-left py-2 text-xs font-medium uppercase tracking-wider text-mute">
+                  Name
+                </th>
+                <th className="text-left py-2 text-xs font-medium uppercase tracking-wider text-mute">
+                  Status
+                </th>
+                <th className="text-left py-2 text-xs font-medium uppercase tracking-wider text-mute">
+                  WhatsApp
+                </th>
+                <th className="text-left py-2 text-xs font-medium uppercase tracking-wider text-mute">
+                  Created
+                </th>
+                <th className="text-right py-2 text-xs font-medium uppercase tracking-wider text-mute">
+                  Actions
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {tenants.map((t: Tenant) => (
+                <tr key={t.id} className="border-t border-line">
+                  <td className="py-2 text-ink">{t.name}</td>
+                  <td className="py-2">
+                    <StatusBadge status={t.status as Tenant['status']} />
+                  </td>
+                  <td className="py-2 text-ink-2">
+                    {t.whatsapp_connected ? (
+                      <Badge variant="default">Connected</Badge>
+                    ) : (
+                      <Badge variant="mute">Not connected</Badge>
+                    )}
+                  </td>
+                  <td className="py-2 text-ink-2">{new Date(t.created_at).toLocaleDateString()}</td>
+                  <td className="py-2 text-right">
+                    <Link href={`/tenants/${t.id}`} className="text-sm text-green hover:underline">
+                      View →
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
